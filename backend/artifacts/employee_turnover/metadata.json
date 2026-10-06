@@ -1,0 +1,171 @@
+{
+  "experiment_id": "a9d426ea",
+  "dataset_name": "employee_turnover(1).csv",
+  "target_column": "Employee_Turnover",
+  "problem_type": "binary_classification",
+  "confidence": 1.0,
+  "reason": "Target column has exactly 2 distinct values (['0', '1']).",
+  "best_model_name": "Logistic Regression",
+  "primary_metric": "f1",
+  "best_cv_score_mean": 0.8638,
+  "best_cv_score_std": 0.0247,
+  "holdout_metrics": {
+    "accuracy": 0.8778,
+    "balanced_accuracy": 0.8772,
+    "precision": 0.8784,
+    "recall": 0.8778,
+    "f1": 0.8777,
+    "f1_macro": 0.8775,
+    "roc_auc": 0.9605
+  },
+  "dev_samples": 720,
+  "holdout_samples": 180,
+  "features_used": [
+    "Job_Satisfaction",
+    "Performance_Rating",
+    "Years_At_Company",
+    "Work_Life_Balance",
+    "Distance_From_Home",
+    "Monthly_Income",
+    "Education_Level",
+    "Age",
+    "Num_Companies_Worked",
+    "Employee_Role",
+    "Annual_Bonus",
+    "Training_Hours",
+    "Department",
+    "Annual_Bonus_Squared",
+    "Annual_Bonus_Training_Hours_Interaction"
+  ],
+  "exclusions_count": 1,
+  "exclusions": [
+    {
+      "column": "[ROWS]",
+      "reason": "Dropped 450 duplicate rows.",
+      "action": "dropped_rows"
+    }
+  ],
+  "leaderboard": [
+    {
+      "rank": 1,
+      "model": "Logistic Regression",
+      "cv_score": 0.8638,
+      "cv_std": 0.0247,
+      "metrics": {
+        "accuracy": 0.8639,
+        "balanced_accuracy": 0.8636,
+        "precision": 0.8647,
+        "recall": 0.8639,
+        "f1": 0.8638,
+        "f1_macro": 0.8637,
+        "roc_auc": 0.9467
+      },
+      "fit_time_seconds": 0.19,
+      "status": "success"
+    },
+    {
+      "rank": 2,
+      "model": "CatBoost",
+      "cv_score": 0.8523,
+      "cv_std": 0.0325,
+      "metrics": {
+        "accuracy": 0.8528,
+        "balanced_accuracy": 0.8524,
+        "precision": 0.8566,
+        "recall": 0.8528,
+        "f1": 0.8523,
+        "f1_macro": 0.8522,
+        "roc_auc": 0.9321
+      },
+      "fit_time_seconds": 2.62,
+      "status": "success"
+    },
+    {
+      "rank": 3,
+      "model": "XGBoost",
+      "cv_score": 0.844,
+      "cv_std": 0.0283,
+      "metrics": {
+        "accuracy": 0.8444,
+        "balanced_accuracy": 0.8443,
+        "precision": 0.8477,
+        "recall": 0.8444,
+        "f1": 0.844,
+        "f1_macro": 0.8439,
+        "roc_auc": 0.9248
+      },
+      "fit_time_seconds": 1.54,
+      "status": "success"
+    },
+    {
+      "rank": 4,
+      "model": "HistGradientBoosting",
+      "cv_score": 0.8372,
+      "cv_std": 0.031,
+      "metrics": {
+        "accuracy": 0.8375,
+        "balanced_accuracy": 0.8375,
+        "precision": 0.8398,
+        "recall": 0.8375,
+        "f1": 0.8372,
+        "f1_macro": 0.8372,
+        "roc_auc": 0.9156
+      },
+      "fit_time_seconds": 1.42,
+      "status": "success"
+    },
+    {
+      "rank": 5,
+      "model": "Random Forest",
+      "cv_score": 0.8345,
+      "cv_std": 0.0315,
+      "metrics": {
+        "accuracy": 0.8347,
+        "balanced_accuracy": 0.8343,
+        "precision": 0.8358,
+        "recall": 0.8347,
+        "f1": 0.8345,
+        "f1_macro": 0.8343,
+        "roc_auc": 0.9144
+      },
+      "fit_time_seconds": 1.74,
+      "status": "success"
+    },
+    {
+      "rank": 6,
+      "model": "Extra Trees",
+      "cv_score": 0.8342,
+      "cv_std": 0.0234,
+      "metrics": {
+        "accuracy": 0.8347,
+        "balanced_accuracy": 0.834,
+        "precision": 0.8373,
+        "recall": 0.8347,
+        "f1": 0.8342,
+        "f1_macro": 0.834,
+        "roc_auc": 0.9209
+      },
+      "fit_time_seconds": 1.43,
+      "status": "success"
+    },
+    {
+      "rank": 7,
+      "model": "LightGBM",
+      "cv_score": 0.826,
+      "cv_std": 0.0231,
+      "metrics": {
+        "accuracy": 0.8264,
+        "balanced_accuracy": 0.8261,
+        "precision": 0.8288,
+        "recall": 0.8264,
+        "f1": 0.826,
+        "f1_macro": 0.8259,
+        "roc_auc": 0.9184
+      },
+      "fit_time_seconds": 0.72,
+      "status": "success"
+    }
+  ],
+  "total_runtime_seconds": 9.89,
+  "random_state": 42
+}
