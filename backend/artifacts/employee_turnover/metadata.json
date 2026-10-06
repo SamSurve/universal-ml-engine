@@ -1,5 +1,5 @@
 {
-  "experiment_id": "917d2d72",
+  "experiment_id": "3dd47495",
   "dataset_name": "employee_turnover.csv",
   "target_column": "Employee_Turnover",
   "problem_type": "binary_classification",
@@ -48,44 +48,46 @@
       "action": "dropped_rows"
     }
   ],
+  "health_score": 99.0,
+  "health_grade": "Excellent",
   "screening": {
     "enabled": true,
     "time_budget_seconds": 30,
-    "duration_seconds": 33.62,
+    "duration_seconds": 31.76,
     "candidates": [
       {
         "model": "CatBoost",
-        "cv_score": 0.8494,
+        "cv_score": 0.8456,
         "rank": 1,
-        "fit_time": 18.68,
+        "fit_time": 10.77,
         "status": "success"
       },
       {
         "model": "LightGBM",
         "cv_score": 0.8372,
         "rank": 2,
-        "fit_time": 4.43,
+        "fit_time": 5.94,
+        "status": "success"
+      },
+      {
+        "model": "XGBoost",
+        "cv_score": 0.8366,
+        "rank": 3,
+        "fit_time": 6.68,
         "status": "success"
       },
       {
         "model": "Extra Trees",
         "cv_score": 0.8352,
-        "rank": 3,
-        "fit_time": 3.77,
-        "status": "success"
-      },
-      {
-        "model": "XGBoost",
-        "cv_score": 0.8233,
         "rank": 4,
-        "fit_time": 2.92,
+        "fit_time": 3.76,
         "status": "success"
       },
       {
         "model": "Random Forest",
-        "cv_score": 0.7911,
+        "cv_score": 0.7955,
         "rank": 5,
-        "fit_time": 2.24,
+        "fit_time": 2.88,
         "status": "success"
       }
     ]
@@ -94,7 +96,7 @@
     "enabled": true,
     "trials_budget": 15,
     "time_budget_seconds": 45,
-    "duration_seconds": 51.98,
+    "duration_seconds": 51.77,
     "candidates": [
       {
         "model": "Logistic Regression",
@@ -105,7 +107,7 @@
         "best_params": {
           "C": 0.31489116479568624
         },
-        "duration": 2.81,
+        "duration": 3.01,
         "status": "success"
       },
       {
@@ -120,7 +122,7 @@
           "depth": 4,
           "l2_leaf_reg": 2.650640588680904
         },
-        "duration": 47.83,
+        "duration": 47.66,
         "status": "success"
       }
     ]
@@ -134,7 +136,7 @@
       "metrics": {
         "f1": 0.8693
       },
-      "fit_time_seconds": 2.81,
+      "fit_time_seconds": 3.01,
       "status": "success"
     },
     {
@@ -151,7 +153,7 @@
         "f1_macro": 0.8637,
         "roc_auc": 0.9467
       },
-      "fit_time_seconds": 0.18,
+      "fit_time_seconds": 0.28,
       "status": "success"
     },
     {
@@ -162,7 +164,7 @@
       "metrics": {
         "f1": 0.8566
       },
-      "fit_time_seconds": 47.83,
+      "fit_time_seconds": 47.66,
       "status": "success"
     },
     {
@@ -179,7 +181,7 @@
         "f1_macro": 0.8522,
         "roc_auc": 0.9321
       },
-      "fit_time_seconds": 3.18,
+      "fit_time_seconds": 3.51,
       "status": "success"
     },
     {
@@ -196,7 +198,7 @@
         "f1_macro": 0.8439,
         "roc_auc": 0.9248
       },
-      "fit_time_seconds": 1.63,
+      "fit_time_seconds": 1.73,
       "status": "success"
     },
     {
@@ -213,7 +215,7 @@
         "f1_macro": 0.8372,
         "roc_auc": 0.9156
       },
-      "fit_time_seconds": 2.06,
+      "fit_time_seconds": 1.92,
       "status": "success"
     },
     {
@@ -230,7 +232,7 @@
         "f1_macro": 0.8343,
         "roc_auc": 0.9144
       },
-      "fit_time_seconds": 1.92,
+      "fit_time_seconds": 1.95,
       "status": "success"
     },
     {
@@ -247,7 +249,7 @@
         "f1_macro": 0.834,
         "roc_auc": 0.9209
       },
-      "fit_time_seconds": 1.6,
+      "fit_time_seconds": 1.59,
       "status": "success"
     },
     {
@@ -264,10 +266,41 @@
         "f1_macro": 0.8259,
         "roc_auc": 0.9184
       },
-      "fit_time_seconds": 0.9,
+      "fit_time_seconds": 1.5,
       "status": "success"
     }
   ],
-  "total_runtime_seconds": 97.23,
+  "explainability": {
+    "status": "success",
+    "explainer_type": "shap_linear",
+    "top_features": [
+      {
+        "feature": "Work",
+        "importance": 1.48904,
+        "pct": 20.64
+      },
+      {
+        "feature": "Performance",
+        "importance": 1.42652,
+        "pct": 19.77
+      },
+      {
+        "feature": "Job",
+        "importance": 1.21151,
+        "pct": 16.79
+      },
+      {
+        "feature": "Distance",
+        "importance": 1.16126,
+        "pct": 16.1
+      },
+      {
+        "feature": "Years",
+        "importance": 0.90266,
+        "pct": 12.51
+      }
+    ]
+  },
+  "total_runtime_seconds": 96.22,
   "random_state": 42
 }

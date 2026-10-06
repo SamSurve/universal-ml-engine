@@ -19,6 +19,13 @@ class ColumnType(str, Enum):
     UNKNOWN = "unknown"
 
 
+class QualitySeverity(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
 @dataclass
 class ExclusionRecord:
     column_name: str
@@ -130,6 +137,133 @@ class TunedCandidate:
     error_message: Optional[str] = None
 
 
+# --- Milestone 5: Dataset Intelligence & Health Contracts ---
+
+@dataclass
+class QualityWarning:
+    warning_id: str
+    severity: QualitySeverity
+    affected_columns: List[str]
+    reason: str
+    recommended_action: str
+
+
+@dataclass
+class HealthCategoryScore:
+    category: str
+    score: float
+    weight: float
+    description: str
+    deductions: List[str] = field(default_factory=list)
+
+
+@dataclass
+class DatasetHealthScore:
+    overall_score: float
+    grade: str
+    categories: Dict[str, HealthCategoryScore]
+    major_warnings: List[QualityWarning]
+    clean_signals: List[str]
+    interpretation: str
+
+
+@dataclass
+class CorrelatedPair:
+    feature_a: str
+    feature_b: str
+    correlation: float
+
+
+@dataclass
+class DatasetIntelligenceResult:
+    dataset_shape: tuple
+    target_column: str
+    problem_type: ProblemType
+    numeric_columns: List[str]
+    categorical_columns: List[str]
+    datetime_columns: List[str]
+    text_columns: List[str]
+    missing_percentages: Dict[str, float]
+    duplicate_rows_count: int
+    constant_columns: List[str]
+    near_constant_columns: List[str]
+    high_cardinality_columns: List[str]
+    class_imbalance: Optional[Dict[str, Any]]
+    suspicious_id_columns: List[str]
+    target_leakage_risks: List[str]
+    correlated_numeric_pairs: List[CorrelatedPair]
+    special_handling_columns: Dict[str, str]
+    warnings: List[QualityWarning]
+    health_score: DatasetHealthScore
+
+
+# --- Milestone 5: Explainability & SHAP Contracts ---
+
+@dataclass
+class FeatureImportanceEntry:
+    feature_name: str
+    raw_feature_name: str
+    importance_score: float
+    relative_importance_pct: float
+    rank: int
+
+
+@dataclass
+class PredictionContribution:
+    feature_name: str
+    raw_feature_name: str
+    feature_value: Any
+    shap_value: float
+    direction: str
+
+
+@dataclass
+class PredictionExplanation:
+    sample_index: int
+    predicted_value: Any
+    predicted_probability: Optional[Dict[str, float]]
+    base_value: float
+    contributions: List[PredictionContribution]
+    top_positive_features: List[str]
+    top_negative_features: List[str]
+
+
+@dataclass
+class ExplainabilityResult:
+    status: str
+    explainer_type: str
+    global_importance: List[FeatureImportanceEntry]
+    raw_feature_importance: List[FeatureImportanceEntry]
+    example_explanations: List[PredictionExplanation]
+    warnings: List[str] = field(default_factory=list)
+    transformed_feature_names: List[str] = field(default_factory=list)
+    summary_text: str = ""
+
+
+# --- Milestone 5: Decision Summary & Reporting Contracts ---
+
+@dataclass
+class ModelDecisionSummary:
+    problem_type: str
+    target_column: str
+    primary_metric: str
+    models_screened_count: int
+    models_considered: List[str]
+    selected_model_name: str
+    selection_rationale: str
+    best_cv_score: float
+    cv_score_std: float
+    holdout_metrics: Dict[str, float]
+    tuned_hyperparameters: Optional[Dict[str, Any]]
+    training_runtime_seconds: float
+    tuning_runtime_seconds: float
+    total_runtime_seconds: float
+    dataset_risks: List[str]
+    model_limitations: List[str]
+    explainability_available: bool
+    top_features_summary: List[str]
+
+
 @dataclass
 class ExperimentResult:
     experiment_id: str
@@ -153,3 +287,9 @@ class ExperimentResult:
     screening_time_seconds: float = 0.0
     tuning_time_seconds: float = 0.0
     total_runtime_seconds: float = 0.0
+    # Milestone 5 extensions:
+    dataset_intelligence: Optional[DatasetIntelligenceResult] = None
+    explainability: Optional[ExplainabilityResult] = None
+    decision_summary: Optional[ModelDecisionSummary] = None
+    intelligence_report_path: Optional[str] = None
+    model_report_path: Optional[str] = None

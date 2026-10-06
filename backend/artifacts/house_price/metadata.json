@@ -1,5 +1,5 @@
 {
-  "experiment_id": "17f4d863",
+  "experiment_id": "a368a718",
   "dataset_name": "HousePricePrediction.csv",
   "target_column": "SalePrice",
   "problem_type": "regression",
@@ -49,44 +49,46 @@
       "action": "dropped"
     }
   ],
+  "health_score": 98.8,
+  "health_grade": "Excellent",
   "screening": {
     "enabled": true,
     "time_budget_seconds": 30,
-    "duration_seconds": 30.72,
+    "duration_seconds": 30.67,
     "candidates": [
       {
         "model": "CatBoost",
         "cv_score": 0.7816,
         "rank": 1,
-        "fit_time": 19.17,
+        "fit_time": 23.2,
         "status": "success"
       },
       {
         "model": "LightGBM",
-        "cv_score": 0.7766,
+        "cv_score": 0.7763,
         "rank": 2,
-        "fit_time": 5.36,
+        "fit_time": 3.43,
         "status": "success"
       },
       {
         "model": "XGBoost",
-        "cv_score": 0.7489,
+        "cv_score": 0.7183,
         "rank": 3,
-        "fit_time": 2.81,
+        "fit_time": 1.58,
         "status": "success"
       },
       {
         "model": "Random Forest",
-        "cv_score": 0.6691,
+        "cv_score": 0.6554,
         "rank": 4,
-        "fit_time": 1.07,
+        "fit_time": 0.67,
         "status": "success"
       },
       {
         "model": "Extra Trees",
         "cv_score": 0.5948,
         "rank": 5,
-        "fit_time": 1.44,
+        "fit_time": 1.03,
         "status": "success"
       }
     ]
@@ -95,7 +97,7 @@
     "enabled": true,
     "trials_budget": 15,
     "time_budget_seconds": 45,
-    "duration_seconds": 74.64,
+    "duration_seconds": 94.43,
     "candidates": [
       {
         "model": "CatBoost",
@@ -109,7 +111,7 @@
           "depth": 7,
           "l2_leaf_reg": 6.2186601610043635
         },
-        "duration": 47.37,
+        "duration": 52.69,
         "status": "success"
       },
       {
@@ -124,7 +126,7 @@
           "min_samples_split": 5,
           "min_samples_leaf": 1
         },
-        "duration": 25.99,
+        "duration": 39.72,
         "status": "success"
       }
     ]
@@ -138,7 +140,7 @@
       "metrics": {
         "r2": 0.7967
       },
-      "fit_time_seconds": 47.37,
+      "fit_time_seconds": 52.69,
       "status": "success"
     },
     {
@@ -152,7 +154,7 @@
         "rmse": 35792.0981,
         "r2": 0.7843
       },
-      "fit_time_seconds": 1.79,
+      "fit_time_seconds": 1.47,
       "status": "success"
     },
     {
@@ -163,7 +165,7 @@
       "metrics": {
         "r2": 0.771
       },
-      "fit_time_seconds": 25.99,
+      "fit_time_seconds": 39.72,
       "status": "success"
     },
     {
@@ -177,7 +179,7 @@
         "rmse": 37207.4846,
         "r2": 0.7671
       },
-      "fit_time_seconds": 2.47,
+      "fit_time_seconds": 2.14,
       "status": "success"
     },
     {
@@ -191,7 +193,7 @@
         "rmse": 37211.8218,
         "r2": 0.7669
       },
-      "fit_time_seconds": 1.42,
+      "fit_time_seconds": 0.97,
       "status": "success"
     },
     {
@@ -205,7 +207,7 @@
         "rmse": 37305.1358,
         "r2": 0.7656
       },
-      "fit_time_seconds": 3.58,
+      "fit_time_seconds": 2.71,
       "status": "success"
     },
     {
@@ -219,7 +221,7 @@
         "rmse": 38913.4635,
         "r2": 0.745
       },
-      "fit_time_seconds": 2.16,
+      "fit_time_seconds": 2.13,
       "status": "success"
     },
     {
@@ -233,7 +235,7 @@
         "rmse": 40118.4213,
         "r2": 0.7275
       },
-      "fit_time_seconds": 1.72,
+      "fit_time_seconds": 1.41,
       "status": "success"
     },
     {
@@ -247,7 +249,7 @@
         "rmse": 49950.1629,
         "r2": 0.5776
       },
-      "fit_time_seconds": 0.17,
+      "fit_time_seconds": 0.13,
       "status": "success"
     },
     {
@@ -261,10 +263,41 @@
         "rmse": 50158.7857,
         "r2": 0.5737
       },
-      "fit_time_seconds": 0.17,
+      "fit_time_seconds": 0.19,
       "status": "success"
     }
   ],
-  "total_runtime_seconds": 119.03,
+  "explainability": {
+    "status": "success",
+    "explainer_type": "shap_tree",
+    "top_features": [
+      {
+        "feature": "TotalBsmtSF",
+        "importance": 26802.4993,
+        "pct": 24.77
+      },
+      {
+        "feature": "YearBuilt",
+        "importance": 19863.4507,
+        "pct": 18.36
+      },
+      {
+        "feature": "MSSubClass",
+        "importance": 18856.73417,
+        "pct": 17.43
+      },
+      {
+        "feature": "YearRemodAdd",
+        "importance": 13196.8327,
+        "pct": 12.2
+      },
+      {
+        "feature": "LotArea",
+        "importance": 12674.88653,
+        "pct": 11.71
+      }
+    ]
+  },
+  "total_runtime_seconds": 136.91,
   "random_state": 42
 }

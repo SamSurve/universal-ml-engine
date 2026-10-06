@@ -18,5 +18,8 @@ catboost>=1.2.0
 flaml>=2.1.0
 optuna>=4.0.0
 
+# Explainable AI
+shap>=0.46.0
+
 # Development & Testing
 pytest>=8.0.0

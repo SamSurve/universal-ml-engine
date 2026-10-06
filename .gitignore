@@ -48,6 +48,7 @@ ENV/
 scratch/
 pytest_results.txt
 benchmark_results.txt
+*_utf8.txt
 debug_*.py
 test_pip*.py
 check_*.py
