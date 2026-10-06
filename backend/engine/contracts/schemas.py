@@ -107,6 +107,30 @@ class LeaderboardEntry:
 
 
 @dataclass
+class ScreeningCandidate:
+    model_name: str
+    cv_score: float
+    fit_time_seconds: float
+    rank: int
+    hyperparameters: Dict[str, Any] = field(default_factory=dict)
+    status: str = "success"
+    error_message: Optional[str] = None
+
+
+@dataclass
+class TunedCandidate:
+    model_name: str
+    baseline_cv_score: float
+    tuned_cv_score: float
+    best_params: Dict[str, Any]
+    n_trials: int
+    tuning_time_seconds: float
+    improvement: float
+    status: str = "success"
+    error_message: Optional[str] = None
+
+
+@dataclass
 class ExperimentResult:
     experiment_id: str
     dataset_name: str
@@ -123,3 +147,9 @@ class ExperimentResult:
     artifact_path: Optional[str] = None
     metadata_path: Optional[str] = None
     random_state: int = 42
+    screened_candidates: List[ScreeningCandidate] = field(default_factory=list)
+    tuned_candidates: List[TunedCandidate] = field(default_factory=list)
+    tuned_hyperparameters: Optional[Dict[str, Any]] = None
+    screening_time_seconds: float = 0.0
+    tuning_time_seconds: float = 0.0
+    total_runtime_seconds: float = 0.0

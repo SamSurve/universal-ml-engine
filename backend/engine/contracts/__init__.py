@@ -10,6 +10,8 @@ from backend.engine.contracts.schemas import (
     ModelEvaluationResult,
     LeaderboardEntry,
     ExperimentResult,
+    ScreeningCandidate,
+    TunedCandidate,
 )
 
 __all__ = [
@@ -24,4 +26,6 @@ __all__ = [
     "ModelEvaluationResult",
     "LeaderboardEntry",
     "ExperimentResult",
+    "ScreeningCandidate",
+    "TunedCandidate",
 ]

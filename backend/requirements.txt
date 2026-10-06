@@ -14,8 +14,9 @@ xgboost>=2.0.0
 lightgbm>=4.3.0
 catboost>=1.2.0
 
-# Fast AutoML
+# Fast AutoML & Hyperparameter Optimization
 flaml>=2.1.0
+optuna>=4.0.0
 
 # Development & Testing
 pytest>=8.0.0

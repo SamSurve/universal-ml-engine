@@ -2,7 +2,7 @@ import os
 import uuid
 import time
 import logging
-from typing import Union, Optional, Dict, Any, Tuple
+from typing import Union, Optional, Dict, Any, Tuple, List
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -16,6 +16,8 @@ from backend.engine.contracts.schemas import (
     DatasetProfile,
     ProblemDetectionResult,
     LeaderboardEntry,
+    ScreeningCandidate,
+    TunedCandidate,
 )
 from backend.engine.ingestion.service import IngestionService, DataValidator
 from backend.engine.profiler.analyzer import DatasetProfiler
@@ -26,6 +28,8 @@ from backend.engine.models.registry import ModelRegistry
 from backend.engine.training.cv_runner import CrossValidationRunner
 from backend.engine.evaluation.evaluator import MetricsEvaluator
 from backend.engine.artifacts.serializer import ModelArtifact, ArtifactManager
+from backend.engine.automl.flaml_screener import FLAMLScreener
+from backend.engine.automl.optuna_tuner import OptunaTuner
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +38,10 @@ class AutoMLEngine:
     """
     Unified Orchestrator for the Universal ML Engine.
     Executes the complete end-to-end pipeline:
-    Validate -> Clean -> Preprocess -> Detect Problem -> Multi-Model Train -> CV -> Compare -> Select Best -> Holdout Eval -> Save
+    Validate -> Clean -> Profiling -> Detect Problem -> Leakage Guard
+    -> 80/20 Dev/Holdout Split -> FLAML Screening -> Multi-Model CV Baseline
+    -> Optuna Bayesian Tuning -> Leaderboard Ranking -> Best Model Selection
+    -> Dev Refit -> Single Holdout Evaluation -> Serialization
     """
 
     @classmethod
@@ -46,6 +53,12 @@ class AutoMLEngine:
         dataset_name: Optional[str] = None,
         random_state: int = 42,
         n_splits: int = 5,
+        enable_screening: bool = True,
+        screening_time_budget: int = 60,
+        enable_tuning: bool = True,
+        top_k_to_tune: int = 2,
+        tuning_trials: int = 30,
+        tuning_time_budget: int = 120,
     ) -> ExperimentResult:
         experiment_id = str(uuid.uuid4())[:8]
         start_time = time.time()
@@ -97,7 +110,38 @@ class AutoMLEngine:
             random_state=random_state,
         )
 
-        # 7. Model Candidates Retrieval
+        # Determine primary metric for ranking
+        imbalance_ratio = 1.0
+        if problem_detection.class_distribution and len(problem_detection.class_distribution) >= 2:
+            counts = list(problem_detection.class_distribution.values())
+            imbalance_ratio = max(counts) / min(counts)
+
+        primary_metric = MetricsEvaluator.get_primary_metric_name(
+            problem_detection.problem_type, class_imbalance_ratio=imbalance_ratio
+        )
+        higher_is_better = primary_metric in [
+            "f1", "macro_f1", "r2", "accuracy", "balanced_accuracy", "roc_auc"
+        ]
+
+        # 7. FLAML Fast Candidate Screening
+        screened_candidates: List[ScreeningCandidate] = []
+        screening_start = time.time()
+        if enable_screening:
+            try:
+                screened_candidates = FLAMLScreener.screen(
+                    df_dev=df_dev,
+                    target_column=target_column,
+                    problem_type=problem_detection.problem_type,
+                    column_profiles=final_profile.column_profiles,
+                    time_budget_seconds=screening_time_budget,
+                    n_splits=n_splits,
+                    random_state=random_state,
+                )
+            except Exception as e:
+                logger.warning(f"FLAML screening skipped due to exception: {e}")
+        screening_time = time.time() - screening_start
+
+        # 8. Baseline Cross-Validation on Development Data (Strict Zero-Leakage)
         candidate_models = ModelRegistry.get_models(
             problem_type=problem_detection.problem_type,
             random_state=random_state,
@@ -105,7 +149,6 @@ class AutoMLEngine:
         if not candidate_models:
             raise RuntimeError(f"No candidate models available for problem type {problem_detection.problem_type}.")
 
-        # 8. Cross-Validation on Development Data (Strict Zero-Leakage)
         cv_results, label_encoder = CrossValidationRunner.run_cv(
             df_dev=df_dev,
             target_column=target_column,
@@ -116,25 +159,86 @@ class AutoMLEngine:
             random_state=random_state,
         )
 
-        # 9. Leaderboard Ranking
-        imbalance_ratio = 1.0
-        if problem_detection.class_distribution and len(problem_detection.class_distribution) >= 2:
-            counts = list(problem_detection.class_distribution.values())
-            imbalance_ratio = max(counts) / min(counts)
-
-        primary_metric = MetricsEvaluator.get_primary_metric_name(
-            problem_detection.problem_type, class_imbalance_ratio=imbalance_ratio
-        )
+        # 9. Initial Leaderboard Ranking
         leaderboard = MetricsEvaluator.build_leaderboard(cv_results, primary_metric=primary_metric)
+        if not leaderboard or not any(entry.status == "success" for entry in leaderboard):
+            raise RuntimeError("All candidate models failed during baseline cross-validation.")
 
-        if not leaderboard or leaderboard[0].status != "success":
-            raise RuntimeError("All candidate models failed during cross-validation.")
+        # 10. Optuna Bayesian Hyperparameter Tuning on Top Candidates
+        tuned_candidates: List[TunedCandidate] = []
+        tuned_pipelines: Dict[str, Pipeline] = {}
+        tuning_start = time.time()
+
+        if enable_tuning:
+            # Select top-K models from successful baseline entries
+            candidates_to_tune = [
+                entry.model_name for entry in leaderboard if entry.status == "success"
+            ][:top_k_to_tune]
+
+            for model_name in candidates_to_tune:
+                baseline_entry = next((e for e in leaderboard if e.model_name == model_name), None)
+                baseline_score = baseline_entry.cv_score_mean if baseline_entry else 0.0
+
+                try:
+                    tuned_cand, tuned_pipe = OptunaTuner.tune_model(
+                        model_name=model_name,
+                        df_dev=df_dev,
+                        target_column=target_column,
+                        problem_type=problem_detection.problem_type,
+                        column_profiles=final_profile.column_profiles,
+                        baseline_cv_score=baseline_score,
+                        n_trials=tuning_trials,
+                        timeout_seconds=tuning_time_budget,
+                        n_splits=n_splits,
+                        random_state=random_state,
+                    )
+                    tuned_candidates.append(tuned_cand)
+
+                    if tuned_cand.status == "success" and tuned_cand.improvement > 0:
+                        tuned_pipelines[model_name] = tuned_pipe
+                        # Add tuned model entry to leaderboard
+                        leaderboard.append(
+                            LeaderboardEntry(
+                                rank=0,
+                                model_name=f"{model_name} (Tuned)",
+                                cv_score_mean=tuned_cand.tuned_cv_score,
+                                cv_score_std=0.0,
+                                primary_metric=primary_metric,
+                                summary_metrics={primary_metric: tuned_cand.tuned_cv_score},
+                                fit_time_seconds=tuned_cand.tuning_time_seconds,
+                                status="success",
+                            )
+                        )
+                except Exception as e:
+                    logger.warning(f"Optuna tuning for '{model_name}' failed: {e}")
+                    tuned_candidates.append(
+                        TunedCandidate(
+                            model_name=model_name,
+                            baseline_cv_score=baseline_score,
+                            tuned_cv_score=baseline_score,
+                            best_params={},
+                            n_trials=0,
+                            tuning_time_seconds=0.0,
+                            improvement=0.0,
+                            status="failed",
+                            error_message=str(e),
+                        )
+                    )
+
+        tuning_time = time.time() - tuning_start
+
+        # Re-sort leaderboard with tuned models included
+        leaderboard.sort(
+            key=lambda e: (e.status == "success", e.cv_score_mean if higher_is_better else -e.cv_score_mean),
+            reverse=True,
+        )
+        for rank_idx, entry in enumerate(leaderboard):
+            entry.rank = rank_idx + 1
 
         best_entry = leaderboard[0]
         best_model_name = best_entry.model_name
-        best_model_instance = candidate_models[best_model_name]
 
-        # 10. Refit Best Model on 100% of Development Data
+        # 11. Final Model Pipeline Preparation
         X_dev = df_dev.drop(columns=[target_column])
         y_dev = df_dev[target_column]
         if label_encoder is not None:
@@ -145,17 +249,28 @@ class AutoMLEngine:
         num_cols, cat_cols, date_cols = PreprocessingPipelineBuilder.identify_feature_types(
             X_dev, final_profile.column_profiles
         )
-        scale_features = "Linear" in best_model_name or "Ridge" in best_model_name or "Logistic" in best_model_name
-        refit_preprocessor = PreprocessingPipelineBuilder.build_preprocessor(
-            num_cols, cat_cols, date_cols, scale_numeric=scale_features
-        )
-        final_pipeline = Pipeline([
-            ("preprocessor", refit_preprocessor),
-            ("model", clone(best_model_instance)),
-        ])
-        final_pipeline.fit(X_dev, y_dev_encoded)
 
-        # 11. Final Evaluation on Untouched Holdout Data
+        tuned_hyperparameters = None
+        if "(Tuned)" in best_model_name:
+            raw_model_name = best_model_name.replace(" (Tuned)", "")
+            final_pipeline = tuned_pipelines[raw_model_name]
+            matched_tuned = next((tc for tc in tuned_candidates if tc.model_name == raw_model_name), None)
+            if matched_tuned:
+                tuned_hyperparameters = matched_tuned.best_params
+        else:
+            # Baseline model won: refit baseline estimator on 100% development data
+            best_model_instance = candidate_models[best_model_name]
+            scale_features = "Linear" in best_model_name or "Ridge" in best_model_name or "Logistic" in best_model_name
+            refit_preprocessor = PreprocessingPipelineBuilder.build_preprocessor(
+                num_cols, cat_cols, date_cols, scale_numeric=scale_features
+            )
+            final_pipeline = Pipeline([
+                ("preprocessor", refit_preprocessor),
+                ("model", clone(best_model_instance)),
+            ])
+            final_pipeline.fit(X_dev, y_dev_encoded)
+
+        # 12. Final Evaluation on Untouched 20% Holdout Data
         X_holdout = df_holdout.drop(columns=[target_column])
         y_holdout = df_holdout[target_column]
         if label_encoder is not None:
@@ -184,7 +299,7 @@ class AutoMLEngine:
         else:
             holdout_metrics = MetricsEvaluator.evaluate_regression(y_holdout_encoded, y_holdout_pred)
 
-        # 12. Model Artifact Serialization
+        # 13. Model Artifact Serialization & Metadata
         artifact = ModelArtifact(
             pipeline=final_pipeline,
             problem_type=problem_detection.problem_type,
@@ -193,7 +308,9 @@ class AutoMLEngine:
             feature_names=list(X_dev.columns),
         )
 
+        total_runtime = round(time.time() - start_time, 2)
         run_output_dir = output_dir or f"artifacts/run_{experiment_id}"
+
         metadata = {
             "experiment_id": experiment_id,
             "dataset_name": dataset_name,
@@ -205,6 +322,7 @@ class AutoMLEngine:
             "primary_metric": primary_metric,
             "best_cv_score_mean": best_entry.cv_score_mean,
             "best_cv_score_std": best_entry.cv_score_std,
+            "tuned_hyperparameters": tuned_hyperparameters,
             "holdout_metrics": holdout_metrics,
             "dev_samples": len(df_dev),
             "holdout_samples": len(df_holdout),
@@ -214,6 +332,40 @@ class AutoMLEngine:
                 {"column": ex.column_name, "reason": ex.reason, "action": ex.action}
                 for ex in validation_result.exclusions
             ],
+            "screening": {
+                "enabled": enable_screening,
+                "time_budget_seconds": screening_time_budget,
+                "duration_seconds": round(screening_time, 2),
+                "candidates": [
+                    {
+                        "model": sc.model_name,
+                        "cv_score": sc.cv_score,
+                        "rank": sc.rank,
+                        "fit_time": sc.fit_time_seconds,
+                        "status": sc.status,
+                    }
+                    for sc in screened_candidates
+                ],
+            },
+            "tuning": {
+                "enabled": enable_tuning,
+                "trials_budget": tuning_trials,
+                "time_budget_seconds": tuning_time_budget,
+                "duration_seconds": round(tuning_time, 2),
+                "candidates": [
+                    {
+                        "model": tc.model_name,
+                        "baseline_score": tc.baseline_cv_score,
+                        "tuned_score": tc.tuned_cv_score,
+                        "improvement": tc.improvement,
+                        "n_trials": tc.n_trials,
+                        "best_params": tc.best_params,
+                        "duration": tc.tuning_time_seconds,
+                        "status": tc.status,
+                    }
+                    for tc in tuned_candidates
+                ],
+            },
             "leaderboard": [
                 {
                     "rank": entry.rank,
@@ -226,7 +378,7 @@ class AutoMLEngine:
                 }
                 for entry in leaderboard
             ],
-            "total_runtime_seconds": round(time.time() - start_time, 2),
+            "total_runtime_seconds": total_runtime,
             "random_state": random_state,
         }
 
@@ -252,4 +404,10 @@ class AutoMLEngine:
             artifact_path=saved_model_path,
             metadata_path=saved_meta_path,
             random_state=random_state,
+            screened_candidates=screened_candidates,
+            tuned_candidates=tuned_candidates,
+            tuned_hyperparameters=tuned_hyperparameters,
+            screening_time_seconds=round(screening_time, 2),
+            tuning_time_seconds=round(tuning_time, 2),
+            total_runtime_seconds=total_runtime,
         )

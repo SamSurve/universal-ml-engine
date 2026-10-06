@@ -13,7 +13,7 @@ from backend.engine.orchestrator import AutoMLEngine
 
 def run_benchmarks():
     print("=" * 80)
-    print("UNIVERSAL ML ENGINE — REAL DATASET BENCHMARK EXECUTION")
+    print("UNIVERSAL ML ENGINE — AUTOML SCREENING & TUNING BENCHMARK EXECUTION")
     print("=" * 80)
 
     # 1. Employee Turnover Dataset (Classification)
@@ -31,19 +31,41 @@ def run_benchmarks():
         output_dir=str(project_root / "backend" / "artifacts" / "employee_turnover"),
         random_state=42,
         n_splits=5,
+        enable_screening=True,
+        screening_time_budget=30,
+        enable_tuning=True,
+        top_k_to_tune=2,
+        tuning_trials=15,
+        tuning_time_budget=45,
     )
 
     print(f"Detected Problem: {turnover_result.problem_detection.problem_type.value} "
           f"(Confidence: {turnover_result.problem_detection.confidence:.2f})")
     print(f"Exclusions Recorded: {len(turnover_result.validation_result.exclusions)}")
     print(f"Dev Shape: {turnover_result.dev_shape}, Holdout Shape: {turnover_result.holdout_shape}")
-    print("\nLeaderboard:")
+
+    if turnover_result.screened_candidates:
+        print("\nFLAML Screened Candidates:")
+        for sc in turnover_result.screened_candidates:
+            print(f"  Rank {sc.rank}: {sc.model_name:<20} | CV Score: {sc.cv_score:.4f} | Time: {sc.fit_time_seconds:.2f}s | Status: {sc.status}")
+
+    if turnover_result.tuned_candidates:
+        print("\nOptuna Tuned Candidates:")
+        for tc in turnover_result.tuned_candidates:
+            print(f"  Model: {tc.model_name:<20} | Baseline: {tc.baseline_cv_score:.4f} -> Tuned: {tc.tuned_cv_score:.4f} "
+                  f"(Imp: {tc.improvement:+.4f}) | Trials: {tc.n_trials} | Time: {tc.tuning_time_seconds:.2f}s")
+
+    print("\nFinal Leaderboard:")
     for entry in turnover_result.leaderboard:
         print(f"  Rank {entry.rank}: {entry.model_name:<25} | "
               f"CV {entry.primary_metric}: {entry.cv_score_mean:.4f} +/- {entry.cv_score_std:.4f} | "
               f"Fit Time: {entry.fit_time_seconds:.2f}s | Status: {entry.status}")
+
     print(f"\nBest Model Selected: {turnover_result.best_model_name}")
+    if turnover_result.tuned_hyperparameters:
+        print(f"Tuned Hyperparameters: {json.dumps(turnover_result.tuned_hyperparameters, indent=2)}")
     print(f"Holdout Evaluation Metrics: {json.dumps(turnover_result.holdout_metrics, indent=2)}")
+    print(f"Total Runtime: {turnover_result.total_runtime_seconds:.2f}s")
     print(f"Saved Artifact: {turnover_result.artifact_path}")
 
     # 2. House Price Prediction Dataset (Regression)
@@ -61,19 +83,41 @@ def run_benchmarks():
         output_dir=str(project_root / "backend" / "artifacts" / "house_price"),
         random_state=42,
         n_splits=5,
+        enable_screening=True,
+        screening_time_budget=30,
+        enable_tuning=True,
+        top_k_to_tune=2,
+        tuning_trials=15,
+        tuning_time_budget=45,
     )
 
     print(f"Detected Problem: {house_result.problem_detection.problem_type.value} "
           f"(Confidence: {house_result.problem_detection.confidence:.2f})")
     print(f"Exclusions Recorded: {len(house_result.validation_result.exclusions)}")
     print(f"Dev Shape: {house_result.dev_shape}, Holdout Shape: {house_result.holdout_shape}")
-    print("\nLeaderboard:")
+
+    if house_result.screened_candidates:
+        print("\nFLAML Screened Candidates:")
+        for sc in house_result.screened_candidates:
+            print(f"  Rank {sc.rank}: {sc.model_name:<20} | CV Score: {sc.cv_score:.4f} | Time: {sc.fit_time_seconds:.2f}s | Status: {sc.status}")
+
+    if house_result.tuned_candidates:
+        print("\nOptuna Tuned Candidates:")
+        for tc in house_result.tuned_candidates:
+            print(f"  Model: {tc.model_name:<20} | Baseline: {tc.baseline_cv_score:.4f} -> Tuned: {tc.tuned_cv_score:.4f} "
+                  f"(Imp: {tc.improvement:+.4f}) | Trials: {tc.n_trials} | Time: {tc.tuning_time_seconds:.2f}s")
+
+    print("\nFinal Leaderboard:")
     for entry in house_result.leaderboard:
         print(f"  Rank {entry.rank}: {entry.model_name:<25} | "
               f"CV {entry.primary_metric}: {entry.cv_score_mean:.4f} +/- {entry.cv_score_std:.4f} | "
               f"Fit Time: {entry.fit_time_seconds:.2f}s | Status: {entry.status}")
+
     print(f"\nBest Model Selected: {house_result.best_model_name}")
+    if house_result.tuned_hyperparameters:
+        print(f"Tuned Hyperparameters: {json.dumps(house_result.tuned_hyperparameters, indent=2)}")
     print(f"Holdout Evaluation Metrics: {json.dumps(house_result.holdout_metrics, indent=2)}")
+    print(f"Total Runtime: {house_result.total_runtime_seconds:.2f}s")
     print(f"Saved Artifact: {house_result.artifact_path}")
 
     print("\n" + "=" * 80)

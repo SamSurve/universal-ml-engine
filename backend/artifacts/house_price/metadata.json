@@ -1,19 +1,25 @@
 {
-  "experiment_id": "52b45893",
-  "dataset_name": "HousePricePrediction(1).csv",
+  "experiment_id": "17f4d863",
+  "dataset_name": "HousePricePrediction.csv",
   "target_column": "SalePrice",
   "problem_type": "regression",
   "confidence": 0.95,
   "reason": "Target column is numeric with 663 unique continuous values (float: True, has fractional values: False).",
-  "best_model_name": "CatBoost",
+  "best_model_name": "CatBoost (Tuned)",
   "primary_metric": "r2",
-  "best_cv_score_mean": 0.7843,
-  "best_cv_score_std": 0.0329,
+  "best_cv_score_mean": 0.7967,
+  "best_cv_score_std": 0.0,
+  "tuned_hyperparameters": {
+    "iterations": 150,
+    "learning_rate": 0.15218560699686326,
+    "depth": 7,
+    "l2_leaf_reg": 6.2186601610043635
+  },
   "holdout_metrics": {
-    "mae": 22420.3294,
-    "mse": 1168938528.8754,
-    "rmse": 34189.743,
-    "r2": 0.8476
+    "mae": 23221.1238,
+    "mse": 1308053502.5761,
+    "rmse": 36167.0223,
+    "r2": 0.8295
   },
   "dev_samples": 1168,
   "holdout_samples": 292,
@@ -43,9 +49,100 @@
       "action": "dropped"
     }
   ],
+  "screening": {
+    "enabled": true,
+    "time_budget_seconds": 30,
+    "duration_seconds": 30.72,
+    "candidates": [
+      {
+        "model": "CatBoost",
+        "cv_score": 0.7816,
+        "rank": 1,
+        "fit_time": 19.17,
+        "status": "success"
+      },
+      {
+        "model": "LightGBM",
+        "cv_score": 0.7766,
+        "rank": 2,
+        "fit_time": 5.36,
+        "status": "success"
+      },
+      {
+        "model": "XGBoost",
+        "cv_score": 0.7489,
+        "rank": 3,
+        "fit_time": 2.81,
+        "status": "success"
+      },
+      {
+        "model": "Random Forest",
+        "cv_score": 0.6691,
+        "rank": 4,
+        "fit_time": 1.07,
+        "status": "success"
+      },
+      {
+        "model": "Extra Trees",
+        "cv_score": 0.5948,
+        "rank": 5,
+        "fit_time": 1.44,
+        "status": "success"
+      }
+    ]
+  },
+  "tuning": {
+    "enabled": true,
+    "trials_budget": 15,
+    "time_budget_seconds": 45,
+    "duration_seconds": 74.64,
+    "candidates": [
+      {
+        "model": "CatBoost",
+        "baseline_score": 0.7843,
+        "tuned_score": 0.7967,
+        "improvement": 0.0124,
+        "n_trials": 15,
+        "best_params": {
+          "iterations": 150,
+          "learning_rate": 0.15218560699686326,
+          "depth": 7,
+          "l2_leaf_reg": 6.2186601610043635
+        },
+        "duration": 47.37,
+        "status": "success"
+      },
+      {
+        "model": "Extra Trees",
+        "baseline_score": 0.7671,
+        "tuned_score": 0.771,
+        "improvement": 0.0039,
+        "n_trials": 15,
+        "best_params": {
+          "n_estimators": 50,
+          "max_depth": 16,
+          "min_samples_split": 5,
+          "min_samples_leaf": 1
+        },
+        "duration": 25.99,
+        "status": "success"
+      }
+    ]
+  },
   "leaderboard": [
     {
       "rank": 1,
+      "model": "CatBoost (Tuned)",
+      "cv_score": 0.7967,
+      "cv_std": 0.0,
+      "metrics": {
+        "r2": 0.7967
+      },
+      "fit_time_seconds": 47.37,
+      "status": "success"
+    },
+    {
+      "rank": 2,
       "model": "CatBoost",
       "cv_score": 0.7843,
       "cv_std": 0.0329,
@@ -55,11 +152,22 @@
         "rmse": 35792.0981,
         "r2": 0.7843
       },
-      "fit_time_seconds": 1.34,
+      "fit_time_seconds": 1.79,
       "status": "success"
     },
     {
-      "rank": 2,
+      "rank": 3,
+      "model": "Extra Trees (Tuned)",
+      "cv_score": 0.771,
+      "cv_std": 0.0,
+      "metrics": {
+        "r2": 0.771
+      },
+      "fit_time_seconds": 25.99,
+      "status": "success"
+    },
+    {
+      "rank": 4,
       "model": "Extra Trees",
       "cv_score": 0.7671,
       "cv_std": 0.0364,
@@ -69,11 +177,11 @@
         "rmse": 37207.4846,
         "r2": 0.7671
       },
-      "fit_time_seconds": 1.59,
+      "fit_time_seconds": 2.47,
       "status": "success"
     },
     {
-      "rank": 3,
+      "rank": 5,
       "model": "LightGBM",
       "cv_score": 0.7669,
       "cv_std": 0.0364,
@@ -83,11 +191,11 @@
         "rmse": 37211.8218,
         "r2": 0.7669
       },
-      "fit_time_seconds": 0.82,
+      "fit_time_seconds": 1.42,
       "status": "success"
     },
     {
-      "rank": 4,
+      "rank": 6,
       "model": "HistGradientBoosting",
       "cv_score": 0.7656,
       "cv_std": 0.0358,
@@ -97,11 +205,11 @@
         "rmse": 37305.1358,
         "r2": 0.7656
       },
-      "fit_time_seconds": 1.75,
+      "fit_time_seconds": 3.58,
       "status": "success"
     },
     {
-      "rank": 5,
+      "rank": 7,
       "model": "Random Forest",
       "cv_score": 0.745,
       "cv_std": 0.0448,
@@ -111,11 +219,11 @@
         "rmse": 38913.4635,
         "r2": 0.745
       },
-      "fit_time_seconds": 1.63,
+      "fit_time_seconds": 2.16,
       "status": "success"
     },
     {
-      "rank": 6,
+      "rank": 8,
       "model": "XGBoost",
       "cv_score": 0.7275,
       "cv_std": 0.0738,
@@ -125,11 +233,11 @@
         "rmse": 40118.4213,
         "r2": 0.7275
       },
-      "fit_time_seconds": 1.43,
+      "fit_time_seconds": 1.72,
       "status": "success"
     },
     {
-      "rank": 7,
+      "rank": 9,
       "model": "Ridge",
       "cv_score": 0.5776,
       "cv_std": 0.1014,
@@ -139,11 +247,11 @@
         "rmse": 49950.1629,
         "r2": 0.5776
       },
-      "fit_time_seconds": 0.12,
+      "fit_time_seconds": 0.17,
       "status": "success"
     },
     {
-      "rank": 8,
+      "rank": 10,
       "model": "Linear Regression",
       "cv_score": 0.5737,
       "cv_std": 0.1068,
@@ -153,10 +261,10 @@
         "rmse": 50158.7857,
         "r2": 0.5737
       },
-      "fit_time_seconds": 0.15,
+      "fit_time_seconds": 0.17,
       "status": "success"
     }
   ],
-  "total_runtime_seconds": 9.21,
+  "total_runtime_seconds": 119.03,
   "random_state": 42
 }
