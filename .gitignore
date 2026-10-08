@@ -65,6 +65,7 @@ run_install.py
 backend/artifacts/run_*/
 backend/artifacts/autogluon_*/
 backend/artifacts/m4_champion_*/
+backend/artifacts/m5_verified_*/
 backend/artifacts/*.joblib
 AutogluonModels/
 catboost_*/

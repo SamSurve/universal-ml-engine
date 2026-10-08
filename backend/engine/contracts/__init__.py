@@ -31,9 +31,10 @@ from backend.engine.contracts.schemas import (
     WorkerResult,
     AutoGluonBackendResult,
     ChampionCandidate,
-    ChampionSelectionResult,
     FinalTestEvaluationResult,
     PersistedChampionManifest,
+    PermutationImportanceResult,
+    M5ReportArtifacts,
 )
 
 __all__ = [
@@ -72,6 +73,8 @@ __all__ = [
     "ChampionSelectionResult",
     "FinalTestEvaluationResult",
     "PersistedChampionManifest",
+    "PermutationImportanceResult",
+    "M5ReportArtifacts",
 ]
 
 

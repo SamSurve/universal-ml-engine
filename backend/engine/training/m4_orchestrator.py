@@ -213,5 +213,8 @@ class M4PipelineRunner:
             "manifest": manifest,
             "manifest_path": manifest_path,
             "predictor": predictor,
+            "df_train": df_train,
+            "df_val": df_val,
+            "df_test": df_test,
             "total_runtime_seconds": total_runtime,
         }

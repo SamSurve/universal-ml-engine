@@ -207,6 +207,7 @@ class FeatureImportanceEntry:
     importance_score: float
     relative_importance_pct: float
     rank: int
+    std_dev: float = 0.0
 
 
 @dataclass
@@ -454,4 +455,25 @@ class PersistedChampionManifest:
     created_at: str = ""
 
 
+# --- Milestone 5: Lightweight Explainability & Automated Visual Reports ---
 
+@dataclass
+class PermutationImportanceResult:
+    problem_type: ProblemType
+    primary_metric: str
+    baseline_score: float
+    importance_entries: List[FeatureImportanceEntry]
+    raw_scores: Dict[str, List[float]] = field(default_factory=dict)
+    n_repeats: int = 5
+    sample_size: int = 0
+    computation_time_seconds: float = 0.0
+    status: str = "success"
+    warnings: List[str] = field(default_factory=list)
+
+
+@dataclass
+class M5ReportArtifacts:
+    report_json_path: str
+    report_md_path: str
+    plot_paths: Dict[str, str] = field(default_factory=dict)
+    generated_at: str = ""
