@@ -27,6 +27,16 @@ from backend.tests.test_baselines import (
 )
 
 from backend.tests.test_reporting import test_decision_summary_and_report_generation
+from backend.tests.test_subprocess_runner import (
+    test_worker_successful_execution,
+    test_worker_stdout_stderr_capture,
+    test_worker_crash_handling,
+    test_worker_timeout_and_forced_termination,
+    test_worker_descendant_process_termination,
+    test_worker_memory_limit_termination,
+    test_worker_invalid_result_handling,
+    test_worker_missing_result_file_handling,
+)
 
 
 def run_all():
@@ -48,7 +58,16 @@ def run_all():
         ("test_baselines::test_baselines_with_real_turnover_data", test_baselines_with_real_turnover_data, False),
         ("test_baselines::test_baselines_with_real_house_price_data", test_baselines_with_real_house_price_data, False),
         ("test_reporting::test_decision_summary_and_report_generation", test_decision_summary_and_report_generation, True),
+        ("test_subprocess_runner::test_worker_successful_execution", test_worker_successful_execution, True),
+        ("test_subprocess_runner::test_worker_stdout_stderr_capture", test_worker_stdout_stderr_capture, True),
+        ("test_subprocess_runner::test_worker_crash_handling", test_worker_crash_handling, True),
+        ("test_subprocess_runner::test_worker_timeout_and_forced_termination", test_worker_timeout_and_forced_termination, True),
+        ("test_subprocess_runner::test_worker_descendant_process_termination", test_worker_descendant_process_termination, True),
+        ("test_subprocess_runner::test_worker_memory_limit_termination", test_worker_memory_limit_termination, True),
+        ("test_subprocess_runner::test_worker_invalid_result_handling", test_worker_invalid_result_handling, True),
+        ("test_subprocess_runner::test_worker_missing_result_file_handling", test_worker_missing_result_file_handling, True),
     ]
+
 
     passed = 0
     failed = 0

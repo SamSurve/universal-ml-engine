@@ -337,3 +337,37 @@ class BaselineSuiteResult:
     best_baseline_score: float
     all_baselines: List[BaselineModelResult]
 
+
+# --- Milestone 2 (v2): Subprocess Worker Infrastructure Contracts ---
+
+class WorkerStatus(str, Enum):
+    SUCCESS = "success"
+    TIMEOUT = "timeout"
+    MEMORY_EXCEEDED = "memory_exceeded"
+    FAILED = "failed"
+    CRASHED = "crashed"
+
+
+@dataclass
+class WorkerJobSpec:
+    job_id: str
+    worker_module: str
+    job_type: str
+    time_limit_seconds: float = 300.0
+    memory_limit_mb: Optional[float] = None
+    params: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class WorkerResult:
+    job_id: str
+    status: WorkerStatus
+    exit_code: Optional[int]
+    runtime_seconds: float
+    peak_memory_mb: float
+    stdout: str = ""
+    stderr: str = ""
+    payload: Dict[str, Any] = field(default_factory=dict)
+    error_message: Optional[str] = None
+
+

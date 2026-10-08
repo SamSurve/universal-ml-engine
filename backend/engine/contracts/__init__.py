@@ -26,6 +26,9 @@ from backend.engine.contracts.schemas import (
     PartitionInfo,
     BaselineModelResult,
     BaselineSuiteResult,
+    WorkerStatus,
+    WorkerJobSpec,
+    WorkerResult,
 )
 
 __all__ = [
@@ -56,5 +59,9 @@ __all__ = [
     "PartitionInfo",
     "BaselineModelResult",
     "BaselineSuiteResult",
+    "WorkerStatus",
+    "WorkerJobSpec",
+    "WorkerResult",
 ]
+
 
