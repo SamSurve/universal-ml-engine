@@ -323,8 +323,10 @@ class BaselineModelResult:
     val_score: float
     val_metrics: Dict[str, float]
     fit_time_seconds: float
+    model_instance: Optional[Any] = None
     status: str = "success"
     error_message: Optional[str] = None
+
 
 
 @dataclass
@@ -387,5 +389,69 @@ class AutoGluonBackendResult:
     val_metrics: Dict[str, float] = field(default_factory=dict)
     autogluon_version: Optional[str] = None
     error_message: Optional[str] = None
+
+
+# --- Milestone 4: Champion Selection, Final Test Evaluation & Persistence Contracts ---
+
+@dataclass
+class ChampionCandidate:
+    candidate_id: str
+    backend_name: str
+    model_name: str
+    problem_type: ProblemType
+    val_metrics: Dict[str, float]
+    primary_metric: str
+    primary_val_score: float
+    artifact_path: Optional[str] = None
+    model_instance: Optional[Any] = None
+    fit_time_seconds: float = 0.0
+    class_labels: Optional[List[Any]] = None
+    extra_metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ChampionSelectionResult:
+    champion: ChampionCandidate
+    problem_type: ProblemType
+    primary_metric: str
+    selection_rationale: str
+    all_candidates: List[ChampionCandidate]
+    validation_comparison: Dict[str, Dict[str, float]]
+    selection_time_seconds: float = 0.0
+
+
+@dataclass
+class FinalTestEvaluationResult:
+    champion_model_name: str
+    champion_backend: str
+    problem_type: ProblemType
+    test_metrics: Dict[str, float]
+    test_rows: int
+    test_sha256: str
+    evaluation_time_seconds: float = 0.0
+
+
+@dataclass
+class PersistedChampionManifest:
+    schema_version: str
+    champion_id: str
+    backend_name: str
+    model_name: str
+    problem_type: ProblemType
+    target_column: str
+    primary_metric: str
+    feature_names: List[str]
+    feature_types: Dict[str, str]
+    class_labels: Optional[List[Any]] = None
+    val_metrics: Dict[str, float] = field(default_factory=dict)
+    test_metrics: Dict[str, float] = field(default_factory=dict)
+    selection_rationale: str = ""
+    all_candidate_metrics: Dict[str, Dict[str, float]] = field(default_factory=dict)
+    artifact_rel_path: str = "model"
+    artifact_type: str = "autogluon"
+    partition_info: Optional[Dict[str, Any]] = None
+    random_state: int = 42
+    created_at: str = ""
+
 
 

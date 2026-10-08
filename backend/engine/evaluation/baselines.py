@@ -20,7 +20,30 @@ from backend.engine.evaluation.evaluator import MetricsEvaluator
 logger = logging.getLogger(__name__)
 
 
+class BaselinePipelineWrapper:
+    """Wraps a fitted baseline model/pipeline and optional LabelEncoder for unified prediction."""
+
+    def __init__(self, model: Any, label_encoder: Optional[LabelEncoder] = None):
+        self.model = model
+        self.label_encoder = label_encoder
+
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
+        raw_preds = self.model.predict(X)
+        if self.label_encoder is not None:
+            try:
+                return self.label_encoder.inverse_transform(raw_preds)
+            except Exception:
+                return raw_preds
+        return raw_preds
+
+    def predict_proba(self, X: pd.DataFrame) -> Optional[np.ndarray]:
+        if hasattr(self.model, "predict_proba"):
+            return self.model.predict_proba(X)
+        return None
+
+
 class BaselineEvaluator:
+
     """
     Evaluates mandatory standard baseline models (Dummy and Linear) on the Validation set.
 
@@ -134,6 +157,7 @@ class BaselineEvaluator:
                 y_pred_dummy = dummy_model.predict(X_val)
                 dummy_metrics = MetricsEvaluator.evaluate_regression(y_val_encoded, y_pred_dummy)
 
+            dummy_wrapper = BaselinePipelineWrapper(dummy_model, label_encoder=label_encoder if is_classification else None)
             dummy_fit_time = round(time.time() - dummy_start, 4)
             dummy_score = dummy_metrics[primary_metric]
 
@@ -145,6 +169,7 @@ class BaselineEvaluator:
                 val_metrics=dummy_metrics,
                 fit_time_seconds=dummy_fit_time,
                 status="success",
+                model_instance=dummy_wrapper,
             )
         except Exception as e:
             logger.error(f"Dummy baseline evaluation failed: {e}")
@@ -207,6 +232,7 @@ class BaselineEvaluator:
             else:
                 linear_metrics = MetricsEvaluator.evaluate_regression(y_val_encoded, y_pred_linear)
 
+            linear_wrapper = BaselinePipelineWrapper(linear_pipeline, label_encoder=label_encoder if is_classification else None)
             linear_fit_time = round(time.time() - linear_start, 4)
             linear_score = linear_metrics[primary_metric]
 
@@ -218,6 +244,7 @@ class BaselineEvaluator:
                 val_metrics=linear_metrics,
                 fit_time_seconds=linear_fit_time,
                 status="success",
+                model_instance=linear_wrapper,
             )
         except Exception as e:
             logger.error(f"Linear baseline evaluation failed: {e}")

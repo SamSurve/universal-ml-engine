@@ -28,25 +28,47 @@ class MetricsEvaluator:
         y_prob: Optional[np.ndarray] = None,
         is_binary: bool = True,
     ) -> Dict[str, float]:
+        from sklearn.preprocessing import LabelEncoder
+
+        # Align y_true and y_pred types to avoid string/number mixing errors
+        y_true_arr = np.asarray(y_true)
+        y_pred_arr = np.asarray(y_pred)
+
+        if y_true_arr.dtype != y_pred_arr.dtype:
+            # If one is string and one is numeric, stringify both
+            if np.issubdtype(y_true_arr.dtype, np.number) != np.issubdtype(y_pred_arr.dtype, np.number):
+                y_true_arr = y_true_arr.astype(str)
+                y_pred_arr = y_pred_arr.astype(str)
+            else:
+                try:
+                    y_pred_arr = y_pred_arr.astype(y_true_arr.dtype)
+                except Exception:
+                    y_true_arr = y_true_arr.astype(str)
+                    y_pred_arr = y_pred_arr.astype(str)
+
         metrics = {
-            "accuracy": float(accuracy_score(y_true, y_pred)),
-            "balanced_accuracy": float(balanced_accuracy_score(y_true, y_pred)),
-            "precision": float(precision_score(y_true, y_pred, average="weighted", zero_division=0)),
-            "recall": float(recall_score(y_true, y_pred, average="weighted", zero_division=0)),
-            "f1": float(f1_score(y_true, y_pred, average="weighted", zero_division=0)),
-            "f1_macro": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
+            "accuracy": float(accuracy_score(y_true_arr, y_pred_arr)),
+            "balanced_accuracy": float(balanced_accuracy_score(y_true_arr, y_pred_arr)),
+            "precision": float(precision_score(y_true_arr, y_pred_arr, average="weighted", zero_division=0)),
+            "recall": float(recall_score(y_true_arr, y_pred_arr, average="weighted", zero_division=0)),
+            "f1": float(f1_score(y_true_arr, y_pred_arr, average="weighted", zero_division=0)),
+            "f1_macro": float(f1_score(y_true_arr, y_pred_arr, average="macro", zero_division=0)),
         }
 
         # Calculate ROC-AUC if probabilities are available
         if y_prob is not None:
             try:
+                # Encode y_true numerically for ROC-AUC
+                le = LabelEncoder()
+                y_true_encoded = le.fit_transform(y_true_arr)
+
                 if is_binary:
                     # In binary classification, y_prob may be 1D or 2D (take column 1)
                     prob_1d = y_prob[:, 1] if y_prob.ndim == 2 and y_prob.shape[1] == 2 else y_prob
-                    metrics["roc_auc"] = float(roc_auc_score(y_true, prob_1d))
+                    metrics["roc_auc"] = float(roc_auc_score(y_true_encoded, prob_1d))
                 else:
                     metrics["roc_auc"] = float(
-                        roc_auc_score(y_true, y_prob, multi_class="ovr", average="weighted")
+                        roc_auc_score(y_true_encoded, y_prob, multi_class="ovr", average="weighted")
                     )
             except Exception:
                 metrics["roc_auc"] = 0.0
