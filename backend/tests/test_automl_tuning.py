@@ -359,7 +359,7 @@ def test_unseen_target_label_validation():
     le.fit(["cat", "dog"])
 
     dummy = DummyClassifier(strategy="constant", constant=99)
-    dummy.fit([[1], [2]], [0, 1])
+    dummy.fit([[1], [2]], [99, 99])
 
     artifact = ModelArtifact(
         pipeline=dummy,
