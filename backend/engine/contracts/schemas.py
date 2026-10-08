@@ -133,6 +133,7 @@ class TunedCandidate:
     n_trials: int
     tuning_time_seconds: float
     improvement: float
+    cv_score_std: float = 0.0
     status: str = "success"
     error_message: Optional[str] = None
 
@@ -293,3 +294,46 @@ class ExperimentResult:
     decision_summary: Optional[ModelDecisionSummary] = None
     intelligence_report_path: Optional[str] = None
     model_report_path: Optional[str] = None
+
+
+# --- Milestone 1 (v2): 3-Way Partition & Baseline Contracts ---
+
+@dataclass
+class PartitionInfo:
+    train_rows: int
+    val_rows: int
+    test_rows: int
+    train_indices: List[int]
+    val_indices: List[int]
+    test_indices: List[int]
+    train_sha256: str
+    val_sha256: str
+    test_sha256: str
+    stratified: bool
+    random_state: int
+    target_column: str
+    problem_type: ProblemType
+
+
+@dataclass
+class BaselineModelResult:
+    model_name: str
+    problem_type: ProblemType
+    primary_metric: str
+    val_score: float
+    val_metrics: Dict[str, float]
+    fit_time_seconds: float
+    status: str = "success"
+    error_message: Optional[str] = None
+
+
+@dataclass
+class BaselineSuiteResult:
+    problem_type: ProblemType
+    primary_metric: str
+    dummy_baseline: BaselineModelResult
+    linear_baseline: BaselineModelResult
+    best_baseline_name: str
+    best_baseline_score: float
+    all_baselines: List[BaselineModelResult]
+

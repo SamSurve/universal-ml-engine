@@ -31,7 +31,10 @@ class ModelArtifact:
         """Generates real-time predictions on unseen tabular data."""
         preds = self.pipeline.predict(X)
         if self.label_encoder is not None:
-            return self.label_encoder.inverse_transform(preds)
+            try:
+                return self.label_encoder.inverse_transform(preds)
+            except Exception as e:
+                raise ValueError(f"Target decoding error: Unable to map predicted classes to original labels: {e}")
         return preds
 
     def predict_proba(self, X: pd.DataFrame):

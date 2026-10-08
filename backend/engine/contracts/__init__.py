@@ -23,6 +23,9 @@ from backend.engine.contracts.schemas import (
     ExplainabilityResult,
     ModelDecisionSummary,
     ExperimentResult,
+    PartitionInfo,
+    BaselineModelResult,
+    BaselineSuiteResult,
 )
 
 __all__ = [
@@ -50,4 +53,8 @@ __all__ = [
     "ExplainabilityResult",
     "ModelDecisionSummary",
     "ExperimentResult",
+    "PartitionInfo",
+    "BaselineModelResult",
+    "BaselineSuiteResult",
 ]
+

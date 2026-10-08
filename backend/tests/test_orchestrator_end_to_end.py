@@ -106,3 +106,45 @@ def test_orchestrator_reproducibility():
     finally:
         shutil.rmtree(temp_dir1, ignore_errors=True)
         shutil.rmtree(temp_dir2, ignore_errors=True)
+
+
+def test_orchestrator_unseen_holdout_label_raises_controlled_error(monkeypatch):
+    """
+    CRITICAL TEST (P3): Verifies that if an unseen class appears in the holdout split,
+    AutoMLEngine raises a controlled ValueError rather than an unhandled crash.
+    """
+    from backend.engine.training.cv_runner import CrossValidationRunner
+
+    np.random.seed(42)
+    n = 60
+    df = pd.DataFrame({
+        "feat": np.random.randn(n),
+        "target": np.random.choice(["class_A", "class_B"], size=n),
+    })
+
+    # Monkeypatch split_dev_holdout so holdout contains an unseen class
+    orig_split = CrossValidationRunner.split_dev_holdout
+
+    def patched_split(*args, **kwargs):
+        df_dev, df_holdout = orig_split(*args, **kwargs)
+        df_holdout = df_holdout.copy()
+        # Inject an unseen class into holdout
+        df_holdout.iloc[0, df_holdout.columns.get_loc("target")] = "unseen_alien_class"
+        return df_dev, df_holdout
+
+    monkeypatch.setattr(CrossValidationRunner, "split_dev_holdout", patched_split)
+
+    temp_dir = tempfile.mkdtemp()
+    try:
+        with pytest.raises(ValueError, match="Target label validation error"):
+            AutoMLEngine.run(
+                data_source=df,
+                target_column="target",
+                output_dir=temp_dir,
+                random_state=42,
+                n_splits=3,
+                enable_screening=False,
+                enable_tuning=False,
+            )
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)

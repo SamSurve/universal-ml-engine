@@ -106,7 +106,22 @@ class OptunaTuner:
         """Defines concise, high-impact search spaces for each model family."""
         params: Dict[str, Any] = {}
 
-        if model_name in ["LightGBM", "XGBoost"]:
+        if model_name == "LightGBM":
+            params["n_estimators"] = trial.suggest_int("n_estimators", 50, 300, step=50)
+            params["learning_rate"] = trial.suggest_float("learning_rate", 0.01, 0.2, log=True)
+            params["max_depth"] = trial.suggest_int("max_depth", 3, 10)
+            params["num_leaves"] = trial.suggest_int("num_leaves", 15, 63)
+            subsample = trial.suggest_float("subsample", 0.6, 1.0)
+            params["subsample"] = subsample
+            params["subsample_freq"] = 1  # required for LightGBM subsample to take effect
+            colsample = trial.suggest_float("feature_fraction", 0.6, 1.0)
+            params["feature_fraction"] = colsample
+            params["colsample_bytree"] = colsample  # support both native name and sklearn alias
+            params["reg_alpha"] = trial.suggest_float("reg_alpha", 1e-3, 10.0, log=True)
+            params["reg_lambda"] = trial.suggest_float("reg_lambda", 1e-3, 10.0, log=True)
+            params["min_child_samples"] = trial.suggest_int("min_child_samples", 5, 30)
+
+        elif model_name == "XGBoost":
             params["n_estimators"] = trial.suggest_int("n_estimators", 50, 300, step=50)
             params["learning_rate"] = trial.suggest_float("learning_rate", 0.01, 0.2, log=True)
             params["max_depth"] = trial.suggest_int("max_depth", 3, 10)
@@ -114,10 +129,7 @@ class OptunaTuner:
             params["colsample_bytree"] = trial.suggest_float("colsample_bytree", 0.6, 1.0)
             params["reg_alpha"] = trial.suggest_float("reg_alpha", 1e-3, 10.0, log=True)
             params["reg_lambda"] = trial.suggest_float("reg_lambda", 1e-3, 10.0, log=True)
-            if model_name == "LightGBM":
-                params["num_leaves"] = trial.suggest_int("num_leaves", 15, 63)
-            elif model_name == "XGBoost":
-                params["gamma"] = trial.suggest_float("gamma", 0.0, 5.0)
+            params["gamma"] = trial.suggest_float("gamma", 0.0, 5.0)
 
         elif model_name == "CatBoost":
             params["iterations"] = trial.suggest_int("iterations", 50, 250, step=50)
@@ -135,6 +147,7 @@ class OptunaTuner:
             params["max_iter"] = trial.suggest_int("max_iter", 50, 200, step=50)
             params["learning_rate"] = trial.suggest_float("learning_rate", 0.01, 0.2, log=True)
             params["max_depth"] = trial.suggest_int("max_depth", 3, 10)
+            params["min_samples_leaf"] = trial.suggest_int("min_samples_leaf", 10, 50)
             params["l2_regularization"] = trial.suggest_float("l2_regularization", 1e-3, 10.0, log=True)
 
         elif model_name == "Logistic Regression":
@@ -142,6 +155,9 @@ class OptunaTuner:
 
         elif model_name == "Ridge":
             params["alpha"] = trial.suggest_float("alpha", 0.01, 100.0, log=True)
+
+        elif model_name == "Linear Regression":
+            params["fit_intercept"] = trial.suggest_categorical("fit_intercept", [True, False])
 
         return params
 
@@ -259,6 +275,7 @@ class OptunaTuner:
                     logger.debug(f"Trial failed on fold {fold_idx}: {e}")
                     raise optuna.TrialPruned()
 
+            trial.set_user_attr("fold_scores", fold_scores)
             return float(np.mean(fold_scores))
 
         # Setup study with fixed sampler and median pruner
@@ -284,12 +301,15 @@ class OptunaTuner:
         if study.best_trials:
             best_params = study.best_params
             best_score = round(float(study.best_value), 4)
+            best_fold_scores = study.best_trial.user_attrs.get("fold_scores", [])
+            best_score_std = round(float(np.std(best_fold_scores)), 4) if best_fold_scores else 0.0
             improvement = round(best_score - baseline_cv_score, 4) if direction == "maximize" else round(baseline_cv_score - best_score, 4)
             status = "success"
             err = None
         else:
             best_params = {}
             best_score = baseline_cv_score
+            best_score_std = 0.0
             improvement = 0.0
             status = "failed"
             err = "No successful trials completed."
@@ -313,6 +333,7 @@ class OptunaTuner:
             n_trials=actual_trials,
             tuning_time_seconds=round(tuning_time, 2),
             improvement=improvement,
+            cv_score_std=best_score_std,
             status=status,
             error_message=err,
         )

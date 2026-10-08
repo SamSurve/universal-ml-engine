@@ -64,6 +64,7 @@ class AutoMLEngine:
         n_splits: int = 5,
         enable_screening: bool = True,
         screening_time_budget: int = 60,
+        screening_top_k: int = 3,
         enable_tuning: bool = True,
         top_k_to_tune: int = 2,
         tuning_trials: int = 30,
@@ -167,12 +168,30 @@ class AutoMLEngine:
         screening_time = time.time() - screening_start
 
         # 9. Baseline Cross-Validation on Development Data (Strict Zero-Leakage)
-        candidate_models = ModelRegistry.get_models(
+        all_candidate_models = ModelRegistry.get_models(
             problem_type=problem_detection.problem_type,
             random_state=random_state,
         )
-        if not candidate_models:
+        if not all_candidate_models:
             raise RuntimeError(f"No candidate models available for problem type {problem_detection.problem_type}.")
+
+        # Select Top-K candidate models based on FLAML screening ranking
+        successful_screened = [c for c in screened_candidates if c.status == "success"]
+        if enable_screening and successful_screened and screening_top_k > 0:
+            top_screened_names = [c.model_name for c in successful_screened[:screening_top_k]]
+            candidate_models = {
+                name: model for name, model in all_candidate_models.items()
+                if name in top_screened_names
+            }
+            if not candidate_models:
+                logger.warning("No FLAML screened candidates matched registry models; falling back to all models.")
+                candidate_models = all_candidate_models
+            else:
+                logger.info(
+                    f"FLAML screening selected top {len(candidate_models)} candidates for CV: {list(candidate_models.keys())}"
+                )
+        else:
+            candidate_models = all_candidate_models
 
         cv_results, label_encoder = CrossValidationRunner.run_cv(
             df_dev=df_dev,
@@ -227,7 +246,7 @@ class AutoMLEngine:
                                 rank=0,
                                 model_name=f"{model_name} (Tuned)",
                                 cv_score_mean=tuned_cand.tuned_cv_score,
-                                cv_score_std=0.0,
+                                cv_score_std=getattr(tuned_cand, "cv_score_std", 0.0),
                                 primary_metric=primary_metric,
                                 summary_metrics={primary_metric: tuned_cand.tuned_cv_score},
                                 fit_time_seconds=tuned_cand.tuning_time_seconds,
@@ -299,6 +318,14 @@ class AutoMLEngine:
         X_holdout = df_holdout.drop(columns=[target_column])
         y_holdout = df_holdout[target_column]
         if label_encoder is not None:
+            known_classes = set(label_encoder.classes_)
+            holdout_classes = set(y_holdout.astype(str))
+            unseen = holdout_classes - known_classes
+            if unseen:
+                raise ValueError(
+                    f"Target label validation error: Holdout set contains unseen class(es) {sorted(list(unseen))}. "
+                    f"Known classes from training: {sorted(list(known_classes))}."
+                )
             y_holdout_encoded = label_encoder.transform(y_holdout.astype(str))
         else:
             y_holdout_encoded = y_holdout.to_numpy(dtype=float)

@@ -31,24 +31,55 @@ class ModelExplainer:
     """
 
     @classmethod
-    def _clean_feature_name(cls, col_name: str) -> Tuple[str, str]:
-        """
-        Cleans Scikit-Learn column transformer prefixes (e.g., 'num__Age' -> 'Age',
-        'cat__Department_sales' -> 'Department_sales').
-        Returns (cleaned_name, raw_parent_name).
-        """
+    def _strip_transformer_prefix(cls, col_name: str) -> str:
+        """Strips ColumnTransformer prefixes if present."""
         cleaned = col_name
-        for prefix in ["num__", "cat__", "date__", "remainder__"]:
+        for prefix in [
+            "num__", "cat__", "date__", "remainder__",
+            "numeric__", "categorical__", "datetime__",
+        ]:
             if cleaned.startswith(prefix):
                 cleaned = cleaned[len(prefix):]
                 break
+        return cleaned
 
-        # Extract raw parent name for one-hot encoded features
-        # e.g., 'Department_sales' -> 'Department' if contains underscore
-        # We also check common one-hot delimiter patterns
-        parts = cleaned.split("_")
-        raw_parent = parts[0] if len(parts) > 1 else cleaned
-        return cleaned, raw_parent
+    @classmethod
+    def _clean_feature_name(
+        cls, col_name: str, original_columns: Optional[List[str]] = None
+    ) -> Tuple[str, str]:
+        """
+        Cleans Scikit-Learn column transformer prefixes (e.g., 'num__Age' -> 'Age',
+        'cat__Department_sales' -> 'Department_sales').
+        Accurately resolves the raw parent feature name without truncating feature names
+        containing underscores (e.g., 'Work_Life_Balance' preserves parent 'Work_Life_Balance').
+
+        Returns (cleaned_name, raw_parent_name).
+        """
+        cleaned = cls._strip_transformer_prefix(col_name)
+
+        if not original_columns:
+            # Without original columns, do not naively split on underscores.
+            # Preserving the full cleaned feature name avoids truncating valid names.
+            return cleaned, cleaned
+
+        # 1. Exact match with an original column (e.g. numeric or un-expanded column)
+        if cleaned in original_columns:
+            return cleaned, cleaned
+
+        # 2. Check prefix matches against original columns, longest column name first
+        # to ensure e.g. 'Job_Role_Level' takes precedence over 'Job_Role'.
+        sorted_orig = sorted(original_columns, key=lambda c: len(c), reverse=True)
+        for orig_col in sorted_orig:
+            # Check standard OneHotEncoder / Datetime delimiter format: {col}_{category}
+            if cleaned.startswith(f"{orig_col}_"):
+                return cleaned, orig_col
+
+        for orig_col in sorted_orig:
+            if cleaned.startswith(orig_col):
+                return cleaned, orig_col
+
+        # 3. Fallback: preserve cleaned name as raw parent
+        return cleaned, cleaned
 
     @classmethod
     def _extract_pipeline_components(
@@ -65,6 +96,7 @@ class ModelExplainer:
             preprocessor = None
             estimator = pipeline
 
+        original_columns = list(X_sample.columns) if hasattr(X_sample, "columns") else []
         transformed_names = []
         raw_parents = []
 
@@ -72,16 +104,16 @@ class ModelExplainer:
             try:
                 feature_names_out = preprocessor.get_feature_names_out()
                 for name in feature_names_out:
-                    clean_name, raw_name = cls._clean_feature_name(str(name))
+                    clean_name, raw_name = cls._clean_feature_name(str(name), original_columns=original_columns)
                     transformed_names.append(clean_name)
                     raw_parents.append(raw_name)
             except Exception:
                 pass
 
         if not transformed_names:
-            if hasattr(X_sample, "columns"):
-                transformed_names = list(X_sample.columns)
-                raw_parents = list(X_sample.columns)
+            if original_columns:
+                transformed_names = list(original_columns)
+                raw_parents = list(original_columns)
             else:
                 n_feats = X_sample.shape[1] if hasattr(X_sample, "shape") else 1
                 transformed_names = [f"feature_{i}" for i in range(n_feats)]
@@ -353,15 +385,16 @@ class ModelExplainer:
                 # Binary classification: take positive class
                 return np.asarray(vals[1], dtype=float)
             elif len(vals) > 0:
-                # Multiclass: take mean absolute across classes or class 0
-                return np.asarray(vals[0], dtype=float)
+                # Multiclass: aggregate mean absolute impact across all classes
+                stacked = np.stack([np.asarray(v, dtype=float) for v in vals], axis=-1)
+                return np.mean(np.abs(stacked), axis=-1)
 
         arr = np.asarray(vals, dtype=float)
         if arr.ndim == 3:
             # (n_samples, n_features, n_classes)
             if arr.shape[2] == 2:
                 return arr[:, :, 1]
-            return np.mean(arr, axis=2)
+            return np.mean(np.abs(arr), axis=2)
         elif arr.ndim == 2:
             return arr
         return None
