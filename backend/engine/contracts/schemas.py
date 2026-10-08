@@ -355,6 +355,7 @@ class WorkerJobSpec:
     job_type: str
     time_limit_seconds: float = 300.0
     memory_limit_mb: Optional[float] = None
+    python_executable: Optional[str] = None
     params: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -368,6 +369,23 @@ class WorkerResult:
     stdout: str = ""
     stderr: str = ""
     payload: Dict[str, Any] = field(default_factory=dict)
+    error_message: Optional[str] = None
+
+
+@dataclass
+class AutoGluonBackendResult:
+    backend_name: str
+    status: WorkerStatus
+    model_best: Optional[str]
+    problem_type: ProblemType
+    eval_metric: str
+    artifact_path: str
+    fit_time_seconds: float
+    peak_memory_mb: float
+    class_labels: Optional[List[Any]] = None
+    leaderboard: List[Dict[str, Any]] = field(default_factory=list)
+    val_metrics: Dict[str, float] = field(default_factory=dict)
+    autogluon_version: Optional[str] = None
     error_message: Optional[str] = None
 
 

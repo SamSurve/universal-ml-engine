@@ -63,3 +63,6 @@ run_install.py
 
 # Artifacts
 backend/artifacts/run_*/
+backend/artifacts/autogluon_*/
+AutogluonModels/
+catboost_*/

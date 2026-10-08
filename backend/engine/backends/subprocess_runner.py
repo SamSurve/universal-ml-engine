@@ -5,7 +5,7 @@ import time
 import subprocess
 import logging
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List, Tuple, Union
 import psutil
 
 from backend.engine.contracts.schemas import (
@@ -89,6 +89,7 @@ class SubprocessRunner:
         job_spec: WorkerJobSpec,
         working_dir: Optional[Path] = None,
         poll_interval_seconds: float = 0.05,
+        python_executable: Optional[Union[str, Path]] = None,
     ) -> WorkerResult:
         """
         Executes a worker job specification in an isolated subprocess.
@@ -97,6 +98,7 @@ class SubprocessRunner:
             job_spec: Job specification defining module, timeout, memory limits, and params.
             working_dir: Working directory for temporary IPC files. Defaults to system temp.
             poll_interval_seconds: Polling sleep interval during execution.
+            python_executable: Custom Python interpreter path to use. Defaults to job_spec.python_executable or sys.executable.
 
         Returns:
             Structured WorkerResult.
@@ -107,6 +109,10 @@ class SubprocessRunner:
         spec_file = run_dir / "job_spec.json"
         result_file = run_dir / "job_result.json"
 
+        # Determine Python executable
+        raw_python = python_executable or getattr(job_spec, "python_executable", None) or sys.executable
+        exec_python = str(Path(raw_python).resolve())
+
         # Serialize job spec to JSON
         spec_dict = {
             "job_id": job_spec.job_id,
@@ -114,6 +120,7 @@ class SubprocessRunner:
             "job_type": job_spec.job_type,
             "time_limit_seconds": job_spec.time_limit_seconds,
             "memory_limit_mb": job_spec.memory_limit_mb,
+            "python_executable": getattr(job_spec, "python_executable", None),
             "params": job_spec.params,
         }
         spec_file.write_text(json.dumps(spec_dict, indent=2), encoding="utf-8")
@@ -122,7 +129,7 @@ class SubprocessRunner:
         if job_spec.worker_module.endswith(".py"):
             target_path = str(Path(job_spec.worker_module).resolve())
             cmd_args = [
-                sys.executable,
+                exec_python,
                 target_path,
                 "--job-spec",
                 str(spec_file.resolve()),
@@ -131,7 +138,7 @@ class SubprocessRunner:
             ]
         else:
             cmd_args = [
-                sys.executable,
+                exec_python,
                 "-m",
                 job_spec.worker_module,
                 "--job-spec",
@@ -149,15 +156,57 @@ class SubprocessRunner:
         start_time = time.time()
         peak_memory_mb = 0.0
 
+        stdout_log_path = run_dir / "worker_stdout.log"
+        stderr_log_path = run_dir / "worker_stderr.log"
+
         try:
-            proc = subprocess.Popen(
-                cmd_args,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                cwd=str(run_dir),
-                env=env,
-            )
+            with open(stdout_log_path, "w", encoding="utf-8", errors="replace") as out_f, \
+                 open(stderr_log_path, "w", encoding="utf-8", errors="replace") as err_f:
+                proc = subprocess.Popen(
+                    cmd_args,
+                    stdin=subprocess.DEVNULL,
+                    stdout=out_f,
+                    stderr=err_f,
+                    text=True,
+                    cwd=str(run_dir),
+                    env=env,
+                )
+
+                worker_pid = proc.pid
+                terminated_status: Optional[WorkerStatus] = None
+                term_error: Optional[str] = None
+
+                # Active monitoring loop
+                while proc.poll() is None:
+                    elapsed = time.time() - start_time
+                    current_mem = measure_process_tree_memory_mb(worker_pid)
+                    peak_memory_mb = max(peak_memory_mb, current_mem)
+
+                    # 1. Memory limit enforcement
+                    if job_spec.memory_limit_mb is not None and current_mem > job_spec.memory_limit_mb:
+                        logger.warning(
+                            f"Worker PID {worker_pid} exceeded memory limit: {current_mem:.1f} MB > {job_spec.memory_limit_mb:.1f} MB. Terminating."
+                        )
+                        terminate_process_tree(worker_pid)
+                        terminated_status = WorkerStatus.MEMORY_EXCEEDED
+                        term_error = (
+                            f"Process tree exceeded memory limit ({current_mem:.1f} MB > {job_spec.memory_limit_mb:.1f} MB)"
+                        )
+                        break
+
+                    # 2. Timeout enforcement
+                    if elapsed > job_spec.time_limit_seconds:
+                        logger.warning(
+                            f"Worker PID {worker_pid} exceeded time limit: {elapsed:.2f}s > {job_spec.time_limit_seconds:.2f}s. Terminating."
+                        )
+                        terminate_process_tree(worker_pid)
+                        terminated_status = WorkerStatus.TIMEOUT
+                        term_error = f"Process timed out after {job_spec.time_limit_seconds:.2f}s (elapsed: {elapsed:.2f}s)"
+                        break
+
+                    time.sleep(poll_interval_seconds)
+
+                proc.wait()
         except Exception as e:
             logger.error(f"Failed to launch worker subprocess: {e}")
             return WorkerResult(
@@ -169,42 +218,9 @@ class SubprocessRunner:
                 error_message=f"Subprocess spawn failed: {e}",
             )
 
-        worker_pid = proc.pid
-        terminated_status: Optional[WorkerStatus] = None
-        term_error: Optional[str] = None
-
-        # Active monitoring loop
-        while proc.poll() is None:
-            elapsed = time.time() - start_time
-            current_mem = measure_process_tree_memory_mb(worker_pid)
-            peak_memory_mb = max(peak_memory_mb, current_mem)
-
-            # 1. Memory limit enforcement
-            if job_spec.memory_limit_mb is not None and current_mem > job_spec.memory_limit_mb:
-                logger.warning(
-                    f"Worker PID {worker_pid} exceeded memory limit: {current_mem:.1f} MB > {job_spec.memory_limit_mb:.1f} MB. Terminating."
-                )
-                terminate_process_tree(worker_pid)
-                terminated_status = WorkerStatus.MEMORY_EXCEEDED
-                term_error = (
-                    f"Process tree exceeded memory limit ({current_mem:.1f} MB > {job_spec.memory_limit_mb:.1f} MB)"
-                )
-                break
-
-            # 2. Timeout enforcement
-            if elapsed > job_spec.time_limit_seconds:
-                logger.warning(
-                    f"Worker PID {worker_pid} exceeded time limit: {elapsed:.2f}s > {job_spec.time_limit_seconds:.2f}s. Terminating."
-                )
-                terminate_process_tree(worker_pid)
-                terminated_status = WorkerStatus.TIMEOUT
-                term_error = f"Process timed out after {job_spec.time_limit_seconds:.2f}s (elapsed: {elapsed:.2f}s)"
-                break
-
-            time.sleep(poll_interval_seconds)
-
-        # Capture outputs
-        stdout, stderr = proc.communicate()
+        # Capture outputs from log files
+        stdout = stdout_log_path.read_text(encoding="utf-8", errors="replace") if stdout_log_path.exists() else ""
+        stderr = stderr_log_path.read_text(encoding="utf-8", errors="replace") if stderr_log_path.exists() else ""
         runtime = round(time.time() - start_time, 4)
 
         # Handle forced termination states
@@ -215,8 +231,8 @@ class SubprocessRunner:
                 exit_code=proc.returncode,
                 runtime_seconds=runtime,
                 peak_memory_mb=round(peak_memory_mb, 2),
-                stdout=stdout or "",
-                stderr=stderr or "",
+                stdout=stdout,
+                stderr=stderr,
                 error_message=term_error,
             )
 
