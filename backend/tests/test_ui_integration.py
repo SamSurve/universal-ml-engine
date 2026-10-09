@@ -310,3 +310,31 @@ def test_10_invalid_csv_and_missing_target_clear_errors(client):
     )
     assert resp_run_missing.status_code == 400
     assert "does not exist in dataset" in resp_run_missing.json()["detail"]
+
+
+def test_11_sample_datasets_and_prediction_playground(client):
+    """Test 11: Sample datasets return exact correct targets and prediction playground options."""
+    # 1. HousePricePrediction.csv must default to SalePrice, never MSSubClass
+    house_resp = client.post("/api/load-sample", json={"filename": "HousePricePrediction.csv"})
+    assert house_resp.status_code == 200
+    house_data = house_resp.json()
+    assert house_data["suggested_target"] == "SalePrice"
+    assert house_data["detected_problem"]["problem_type"] == "regression"
+    assert "categorical_options" in house_data
+    assert "MSZoning" in house_data["categorical_options"]
+
+    # 2. employee_turnover.csv must default to Employee_Turnover
+    turnover_resp = client.post("/api/load-sample", json={"filename": "employee_turnover.csv"})
+    assert turnover_resp.status_code == 200
+    turnover_data = turnover_resp.json()
+    assert turnover_data["suggested_target"] == "Employee_Turnover"
+    assert turnover_data["detected_problem"]["problem_type"] == "binary_classification"
+
+    # 3. Results endpoint returns real sample_test_rows and categorical_options
+    res_resp = client.get("/api/results/m5_verified_regression")
+    assert res_resp.status_code == 200
+    res_data = res_resp.json()
+    assert "sample_test_rows" in res_data
+    assert len(res_data["sample_test_rows"]) > 0
+    assert "categorical_options" in res_data
+

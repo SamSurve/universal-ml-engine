@@ -6,7 +6,8 @@ echo ======================================================================
 echo [1/2] Installing Main Engine & UI Dependencies...
 python -m pip install -r backend\requirements.txt
 if %ERRORLEVEL% NEQ 0 (
-    echo [WARNING] Python command failed. Trying with active interpreter...
+    echo [WARNING] Default python command failed. Trying with py launcher...
+    py -m pip install -r backend\requirements.txt
 )
 
 echo.

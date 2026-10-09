@@ -382,45 +382,80 @@
                 </div>
             </section>
 
-            <!-- LIVE INFERENCE SECTION (REUSING UNIFIED PREDICTOR) -->
+            <!-- STEP 5: PREDICTION PLAYGROUND (REUSING UNIFIED PREDICTOR) -->
             <section class="card" id="inferenceSection">
                 <div class="card-header">
                     <div>
-                        <h2 class="card-title">Live Champion Inference</h2>
-                        <p class="card-desc">Interactive prediction using persisted M4 champion via <span class="text-mono">UnifiedPredictor</span>.</p>
+                        <h2 class="card-title">Prediction Playground</h2>
+                        <p class="card-desc">Make real-time predictions using the reloaded champion model via <span class="text-mono">UnifiedPredictor</span>.</p>
                     </div>
-                    <span class="badge badge-success">Persisted Champion Loaded</span>
+                    <span class="badge badge-success" id="champLoadedBadge">Persisted Champion Loaded</span>
                 </div>
 
                 <div class="inference-toolbar">
-                    <button type="button" class="btn btn-sm btn-indigo" onclick="populateSampleInferenceRow()">
-                        ⚡ Autofill with Sample Test Row
-                    </button>
-                    <span class="toolbar-hint">Instant 1-click test input for live judge demonstration</span>
+                    <div class="sample-selector-group">
+                        <span class="toolbar-label">Choose Example:</span>
+                        <div class="sample-buttons-wrap" id="sampleButtonsWrap">
+                            <!-- Populated dynamically with sample row buttons e.g. Row #1, Row #2, Row #3 -->
+                        </div>
+                    </div>
                 </div>
 
-                <form id="inferenceForm" class="inference-grid" onsubmit="runPrediction(event)">
-                    <!-- Form fields dynamically rendered -->
-                </form>
+                <div class="playground-layout">
+                    <div class="playground-inputs-col">
+                        <div class="section-subhead">
+                            <h3>Feature Inputs</h3>
+                            <span class="badge" id="featureCountBadge">Features</span>
+                        </div>
+                        <p class="input-disclaimer-note">
+                            Target column (<strong id="excludedTargetName">-</strong>) is strictly excluded from inputs. Select an example above or modify fields below.
+                        </p>
+                        <form id="inferenceForm" class="inference-grid" onsubmit="runPrediction(event)">
+                            <!-- Form fields dynamically rendered -->
+                        </form>
 
-                <div class="inference-actions">
-                    <button type="button" class="btn btn-primary" onclick="runPrediction(event)">
-                        ⚡ Run Model Prediction
-                    </button>
-                </div>
+                        <div class="inference-actions">
+                            <button type="button" class="btn btn-primary btn-large" id="btnRunPrediction" onclick="runPrediction(event)">
+                                <span>⚡ Make Prediction</span>
+                            </button>
+                        </div>
+                    </div>
 
-                <!-- Prediction Output Box -->
-                <div id="predictionResultBox" class="prediction-result-box hidden">
-                    <div class="pred-header">
-                        <span class="pred-title">Prediction Result:</span>
-                        <span class="pred-latency badge" id="predLatencyBadge">- ms</span>
-                    </div>
-                    <div class="pred-value-display">
-                        <span class="pred-value" id="predValueDisplay">-</span>
-                    </div>
-                    <div id="probBarContainer" class="prob-bar-container hidden">
-                        <span class="prob-label">Predicted Probabilities:</span>
-                        <div class="prob-bars" id="probBars"></div>
+                    <div class="playground-output-col">
+                        <div class="section-subhead">
+                            <h3>Inference Result</h3>
+                            <span class="badge badge-indigo" id="predTypeBadge">Inference</span>
+                        </div>
+
+                        <!-- Prediction Output Box -->
+                        <div id="predictionResultBox" class="prediction-result-box">
+                            <div class="pred-empty-state" id="predEmptyState">
+                                <div class="empty-icon">🎯</div>
+                                <p>Click <strong>Make Prediction</strong> to evaluate the model on current input features.</p>
+                            </div>
+
+                            <div id="predActiveResult" class="hidden">
+                                <div class="pred-header">
+                                    <span class="pred-title" id="predTargetTitle">Predicted Value</span>
+                                    <span class="pred-latency badge" id="predLatencyBadge">- ms</span>
+                                </div>
+                                <div class="pred-value-display">
+                                    <span class="pred-value" id="predValueDisplay">-</span>
+                                </div>
+
+                                <div id="probBarContainer" class="prob-bar-container hidden">
+                                    <div class="prob-header-row">
+                                        <span class="prob-label">Model-Estimated Probabilities:</span>
+                                    </div>
+                                    <div class="prob-bars" id="probBars"></div>
+                                    <p class="prob-disclaimer">Model-estimated probabilities (uncalibrated inference). Excludes target column from inputs.</p>
+                                </div>
+
+                                <div id="regSummaryBox" class="reg-summary-box hidden">
+                                    <p class="reg-note">Direct numerical prediction computed from persisted champion pipeline via UnifiedPredictor.</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>

@@ -528,8 +528,8 @@ function renderResults(res) {
                 <td class="text-mono">${entry.importance_score >= 0 ? '+' : ''}${formatNumber(entry.importance_score)}</td>
                 <td>
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <div style="flex:1; height:6px; background:#1e293b; border-radius:4px; overflow:hidden;">
-                            <div style="width:${Math.min(100, Math.max(0, entry.relative_importance_pct))}%; height:100%; background:#3b82f6;"></div>
+                        <div style="flex:1; height:6px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
+                            <div style="width:${Math.min(100, Math.max(0, entry.relative_importance_pct))}%; height:100%; background:#2563eb;"></div>
                         </div>
                         <span style="font-size:0.75rem; font-family:'JetBrains Mono';">${entry.relative_importance_pct.toFixed(1)}%</span>
                     </div>
@@ -543,8 +543,15 @@ function renderResults(res) {
     document.getElementById("btnDownloadMd").href = res.reports.markdown_url;
     document.getElementById("btnDownloadJson").href = res.reports.json_url;
 
-    // Inference Form Setup
-    renderInferenceForm(res.features, res.feature_types);
+    // Prediction Playground Setup
+    document.getElementById("excludedTargetName").textContent = res.target_column;
+    document.getElementById("featureCountBadge").textContent = `${res.features.length} Features`;
+    const predTypeBadge = document.getElementById("predTypeBadge");
+    predTypeBadge.textContent = res.problem_type.replace("_", " ").toUpperCase();
+    predTypeBadge.className = `badge ${res.problem_type.includes("classification") ? "badge-task" : "badge-indigo"}`;
+
+    renderSampleRowButtons(res.sample_test_rows);
+    renderInferenceForm(res.features, res.feature_types, res.categorical_options);
 
     // Show Results Wrapper
     document.getElementById("resultsWrapper").classList.remove("hidden");
@@ -558,71 +565,145 @@ function formatPlotTitle(name) {
 }
 
 // -----------------------------------------------------------------------------
-// Inference Section (UnifiedPredictor)
+// Prediction Playground Controller
 // -----------------------------------------------------------------------------
-function renderInferenceForm(features, featureTypes) {
+function renderSampleRowButtons(sampleRows) {
+    const wrap = document.getElementById("sampleButtonsWrap");
+    wrap.innerHTML = "";
+
+    if (!sampleRows || sampleRows.length === 0) {
+        wrap.innerHTML = "<span style='font-size:0.75rem; color:var(--text-muted);'>Manual input mode</span>";
+        return;
+    }
+
+    sampleRows.forEach((row, idx) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `btn-sample-chip ${idx === 0 ? "active" : ""}`;
+        let label = row._row_label || `Example #${idx + 1}`;
+        if (row._ground_truth !== undefined) {
+            label += ` (Actual: ${row._ground_truth})`;
+        }
+        btn.textContent = label;
+        btn.onclick = () => {
+            document.querySelectorAll(".btn-sample-chip").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            populateFormWithRow(row);
+        };
+        wrap.appendChild(btn);
+    });
+}
+
+function renderInferenceForm(features, featureTypes, categoricalOptions) {
     const form = document.getElementById("inferenceForm");
     form.innerHTML = "";
-    document.getElementById("predictionResultBox").classList.add("hidden");
+    
+    // Reset prediction output display
+    document.getElementById("predEmptyState").classList.remove("hidden");
+    document.getElementById("predActiveResult").classList.add("hidden");
 
     if (!features || features.length === 0) {
-        form.innerHTML = "<p style='color:var(--text-muted);'>No features required.</p>";
+        form.innerHTML = "<p style='color:var(--text-muted); font-size:0.8rem;'>No features required.</p>";
         return;
     }
 
     features.forEach(feat => {
         const div = document.createElement("div");
         div.className = "inference-field";
-        const fType = (featureTypes && featureTypes[feat]) ? featureTypes[feat] : "number";
+        const fType = (featureTypes && featureTypes[feat]) ? featureTypes[feat].toLowerCase() : "float64";
         const isNum = fType.includes("int") || fType.includes("float");
+        const options = (categoricalOptions && categoricalOptions[feat]) ? categoricalOptions[feat] : null;
 
-        div.innerHTML = `
-            <label class="field-label" title="${feat}">${escapeHtml(feat)}</label>
-            <input type="${isNum ? 'number' : 'text'}" 
-                   step="any"
-                   id="inf_${feat}" 
-                   class="field-input" 
-                   placeholder="0"
-                   name="${feat}">
-        `;
+        if (options && options.length > 0) {
+            // Render select dropdown for categorical feature
+            let optsHtml = "";
+            options.forEach(optVal => {
+                optsHtml += `<option value="${escapeHtml(optVal)}">${escapeHtml(optVal)}</option>`;
+            });
+            div.innerHTML = `
+                <label class="field-label" title="${escapeHtml(feat)}">${escapeHtml(feat)}</label>
+                <select id="inf_${escapeHtml(feat)}" class="field-select" name="${escapeHtml(feat)}">
+                    ${optsHtml}
+                </select>
+            `;
+        } else {
+            // Render numeric or text input
+            div.innerHTML = `
+                <label class="field-label" title="${escapeHtml(feat)}">${escapeHtml(feat)}</label>
+                <input type="${isNum ? 'number' : 'text'}" 
+                       step="any"
+                       id="inf_${escapeHtml(feat)}" 
+                       class="field-input" 
+                       placeholder="${isNum ? '0' : 'value'}"
+                       name="${escapeHtml(feat)}">
+            `;
+        }
         form.appendChild(div);
     });
 
     // Populate with first sample row if available
-    populateSampleInferenceRow();
+    if (currentResults && currentResults.sample_test_rows && currentResults.sample_test_rows.length > 0) {
+        populateFormWithRow(currentResults.sample_test_rows[0]);
+    }
 }
 
-function populateSampleInferenceRow() {
-    if (!currentResults || !currentResults.sample_test_rows || currentResults.sample_test_rows.length === 0) {
-        return;
-    }
-    const sample = currentResults.sample_test_rows[0];
-    for (const [k, v] of Object.entries(sample)) {
-        const inp = document.getElementById(`inf_${k}`);
-        if (inp) {
-            inp.value = v;
+function populateFormWithRow(row) {
+    if (!row) return;
+    for (const [k, v] of Object.entries(row)) {
+        if (k.startsWith("_")) continue; // skip metadata fields like _ground_truth
+        const elem = document.getElementById(`inf_${k}`);
+        if (elem) {
+            elem.value = v;
         }
     }
 }
 
 async function runPrediction(e) {
     if (e) e.preventDefault();
-    if (!currentResults) return;
+    if (!currentResults) {
+        showError("Model Missing", "Please load a verified run or run analysis before making predictions.");
+        return;
+    }
 
     closeErrorBanner();
+    const btn = document.getElementById("btnRunPrediction");
+    const originalBtnText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span>⏳ Predicting with UnifiedPredictor...</span>`;
+
     const features = {};
+    let hasValidationError = false;
+    let validationMsg = "";
+
     currentResults.features.forEach(feat => {
-        const inp = document.getElementById(`inf_${feat}`);
-        if (inp) {
-            const val = inp.value.trim();
-            const fType = currentResults.feature_types ? currentResults.feature_types[feat] : "";
-            if (fType && (fType.includes("int") || fType.includes("float"))) {
-                features[feat] = val === "" ? 0 : parseFloat(val);
+        const elem = document.getElementById(`inf_${feat}`);
+        if (elem) {
+            const val = elem.value.trim();
+            const fType = (currentResults.feature_types && currentResults.feature_types[feat]) ? currentResults.feature_types[feat].toLowerCase() : "";
+            if (fType.includes("int") || fType.includes("float")) {
+                if (val === "") {
+                    features[feat] = 0;
+                } else {
+                    const num = parseFloat(val);
+                    if (isNaN(num)) {
+                        hasValidationError = true;
+                        validationMsg = `Feature '${feat}' requires a valid numerical value.`;
+                    } else {
+                        features[feat] = num;
+                    }
+                }
             } else {
                 features[feat] = val;
             }
         }
     });
+
+    if (hasValidationError) {
+        btn.disabled = false;
+        btn.innerHTML = originalBtnText;
+        showError("Input Validation Error", validationMsg);
+        return;
+    }
 
     try {
         const resp = await fetch("/api/predict", {
@@ -642,23 +723,32 @@ async function runPrediction(e) {
         renderPredictionResult(data);
     } catch (err) {
         showError("Prediction Error", err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalBtnText;
     }
 }
 
 function renderPredictionResult(data) {
-    const box = document.getElementById("predictionResultBox");
+    document.getElementById("predEmptyState").classList.add("hidden");
+    document.getElementById("predActiveResult").classList.remove("hidden");
+
     const valElem = document.getElementById("predValueDisplay");
     const latElem = document.getElementById("predLatencyBadge");
+    const titleElem = document.getElementById("predTargetTitle");
     const probContainer = document.getElementById("probBarContainer");
     const probBars = document.getElementById("probBars");
+    const regSummaryBox = document.getElementById("regSummaryBox");
 
-    box.classList.remove("hidden");
     latElem.textContent = `${data.latency_ms} ms (UnifiedPredictor)`;
 
-    const isClf = data.problem_type.includes("classification");
+    const isClf = data.problem_type && data.problem_type.includes("classification");
     if (isClf) {
-        valElem.textContent = `Class: ${data.prediction}`;
-        valElem.style.color = "#38bdf8";
+        titleElem.textContent = `Predicted Class (${data.target_column || "Target"})`;
+        regSummaryBox.classList.add("hidden");
+
+        const predClassStr = String(data.prediction);
+        let winningProbabilityPct = null;
 
         if (data.probabilities && data.probabilities.length > 0) {
             probContainer.classList.remove("hidden");
@@ -666,11 +756,19 @@ function renderPredictionResult(data) {
             const labels = data.class_labels || data.probabilities.map((_, i) => `Class ${i}`);
 
             data.probabilities.forEach((p, idx) => {
-                const pct = (p * 100).toFixed(1);
+                const labelStr = String(labels[idx] !== undefined ? labels[idx] : idx);
+                const isWinner = (labelStr === predClassStr || idx === data.prediction || String(idx) === predClassStr);
+                const pctNum = (p * 100);
+                const pct = pctNum.toFixed(1);
+
+                if (isWinner) {
+                    winningProbabilityPct = pct;
+                }
+
                 const row = document.createElement("div");
-                row.className = "prob-bar-row";
+                row.className = `prob-bar-row ${isWinner ? "predicted-winner" : ""}`;
                 row.innerHTML = `
-                    <span class="prob-class-name">${labels[idx] !== undefined ? labels[idx] : idx}</span>
+                    <span class="prob-class-name" title="Class: ${escapeHtml(labelStr)}">${escapeHtml(labelStr)} ${isWinner ? "★" : ""}</span>
                     <div class="prob-bar-track">
                         <div class="prob-bar-fill" style="width: ${pct}%;"></div>
                     </div>
@@ -681,16 +779,25 @@ function renderPredictionResult(data) {
         } else {
             probContainer.classList.add("hidden");
         }
+
+        if (winningProbabilityPct !== null) {
+            valElem.innerHTML = `<span style="color:#2563eb;">${escapeHtml(predClassStr)}</span> <span style="font-size:1.1rem; color:var(--text-muted); font-weight:600;">(${winningProbabilityPct}% probability)</span>`;
+        } else {
+            valElem.innerHTML = `<span style="color:#2563eb;">${escapeHtml(predClassStr)}</span>`;
+        }
+
     } else {
         // Regression formatting
+        titleElem.textContent = `Predicted ${data.target_column || "Value"}`;
+        probContainer.classList.add("hidden");
+        regSummaryBox.classList.remove("hidden");
+
         const numVal = parseFloat(data.prediction);
         if (!isNaN(numVal)) {
-            valElem.textContent = numVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            valElem.innerHTML = `<span style="color:#16a34a;">${numVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
         } else {
-            valElem.textContent = data.prediction;
+            valElem.innerHTML = `<span style="color:#16a34a;">${escapeHtml(String(data.prediction))}</span>`;
         }
-        valElem.style.color = "#34d399";
-        probContainer.classList.add("hidden");
     }
 }
 

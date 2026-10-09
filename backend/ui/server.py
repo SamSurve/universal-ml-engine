@@ -106,27 +106,65 @@ def inspect_dataframe(df: pd.DataFrame, filename: str) -> Dict[str, Any]:
     missing_pct = round((missing_cells / total_cells) * 100.0, 2)
 
     columns_meta = []
+    categorical_options = {}
     for col in df.columns:
         s = df[col]
         n_missing = int(s.isna().sum())
+        n_unique = int(s.nunique(dropna=True))
+        dtype_str = str(s.dtype)
         columns_meta.append({
             "name": str(col),
-            "dtype": str(s.dtype),
+            "dtype": dtype_str,
             "missing_count": n_missing,
             "missing_pct": round((n_missing / row_count) * 100.0, 2) if row_count > 0 else 0.0,
-            "unique_count": int(s.nunique(dropna=True)),
+            "unique_count": n_unique,
         })
+        # If categorical or low-cardinality discrete feature, gather sample choices
+        if dtype_str == "object" or dtype_str == "category" or (n_unique <= 20 and n_unique > 1):
+            unique_vals = [v for v in s.dropna().unique().tolist() if v is not None][:25]
+            # Convert non-serializable types to native python
+            cleaned_vals = []
+            for uv in unique_vals:
+                if isinstance(uv, (np.integer, np.floating)):
+                    cleaned_vals.append(uv.item())
+                else:
+                    cleaned_vals.append(str(uv))
+            categorical_options[str(col)] = cleaned_vals
 
-    # Find candidate target
+    # Priority-based target identification
     candidate_target = None
-    target_keywords = [
-        "employee_turnover", "saleprice", "turnover", "target", "label",
-        "class", "churn", "price", "status", "outcome", "response", "default"
-    ]
-    for col in df.columns:
-        if any(kw in col.lower() for kw in target_keywords):
-            candidate_target = col
-            break
+    lower_filename = filename.lower()
+    
+    # Priority 1: Exact dataset-to-target known mapping
+    if "turnover" in lower_filename and "Employee_Turnover" in df.columns:
+        candidate_target = "Employee_Turnover"
+    elif ("house" in lower_filename or "price" in lower_filename) and "SalePrice" in df.columns:
+        candidate_target = "SalePrice"
+
+    # Priority 2: Exact column name matches (case-insensitive)
+    if not candidate_target:
+        exact_target_names = [
+            "employee_turnover", "saleprice", "target", "label", "class",
+            "churn", "turnover", "price", "outcome", "status", "response", "default", "survived"
+        ]
+        col_lower_map = {str(c).lower(): c for c in df.columns}
+        for kw in exact_target_names:
+            if kw in col_lower_map:
+                candidate_target = col_lower_map[kw]
+                break
+
+    # Priority 3: Specific target keywords avoiding feature substring traps like MSSubClass
+    if not candidate_target:
+        avoid_cols = {"id", "mssubclass", "education_level", "index", "user_id", "row_id", "unnamed: 0"}
+        target_keywords = ["saleprice", "employee_turnover", "turnover", "target", "label", "churn", "price", "outcome", "response", "default"]
+        for col in df.columns:
+            c_low = str(col).lower()
+            if c_low in avoid_cols:
+                continue
+            if any(kw in c_low for kw in target_keywords):
+                candidate_target = col
+                break
+
     if not candidate_target and len(df.columns) > 0:
         candidate_target = df.columns[-1]
 
@@ -155,6 +193,7 @@ def inspect_dataframe(df: pd.DataFrame, filename: str) -> Dict[str, Any]:
         "missing_cells": missing_cells,
         "missing_percentage": missing_pct,
         "columns": columns_meta,
+        "categorical_options": categorical_options,
         "preview_rows": preview_rows,
         "suggested_target": candidate_target,
         "detected_problem": detected_problem,
@@ -193,21 +232,82 @@ def load_result_from_disk(run_dir: Path) -> Dict[str, Any]:
             plot_name = p_file.stem
             plot_urls[plot_name] = f"/api/artifacts/{run_dir.name}/plots/{p_file.name}"
 
-    # Sample rows for inference
+    # Extract real sample test rows and categorical options from source datasets
     sample_rows = []
-    # Check if raw dataset or sample exists
-    ds_name = manifest.get("target_column")
-    # Generate generic default sample values based on feature names
-    sample_dict = {}
-    for feat in manifest.get("feature_names", []):
-        feat_type = manifest.get("feature_types", {}).get(feat, "float64")
-        if "int" in feat_type:
-            sample_dict[feat] = 1
-        elif "float" in feat_type:
-            sample_dict[feat] = 1.0
-        else:
-            sample_dict[feat] = "sample"
-    sample_rows.append(sample_dict)
+    categorical_options = {}
+    target_col = manifest.get("target_column", "")
+    feature_names = manifest.get("feature_names", [])
+
+    # Locate source dataset if available
+    source_df = None
+    possible_paths = [
+        PROJECT_ROOT / "employee_turnover.csv",
+        PROJECT_ROOT / "HousePricePrediction.csv",
+    ]
+    # Check if dataset_name matches
+    ds_name = overview.get("dataset_name", "")
+    if ds_name:
+        possible_paths.insert(0, PROJECT_ROOT / ds_name)
+
+    # Match dataset by target column or name
+    for p in possible_paths:
+        if p.exists():
+            try:
+                candidate_df = pd.read_csv(p)
+                if target_col in candidate_df.columns:
+                    source_df = candidate_df
+                    break
+            except Exception:
+                pass
+
+    if source_df is not None and not source_df.empty:
+        # Extract up to 5 real rows from the dataset
+        sample_subset = source_df.head(5).copy()
+        for idx, row in sample_subset.iterrows():
+            row_dict = {}
+            for feat in feature_names:
+                if feat in row:
+                    val = row[feat]
+                    if pd.isna(val):
+                        row_dict[feat] = ""
+                    elif isinstance(val, (np.integer, np.floating)):
+                        row_dict[feat] = val.item()
+                    else:
+                        row_dict[feat] = str(val)
+                else:
+                    row_dict[feat] = 0
+            if target_col in row:
+                gt_val = row[target_col]
+                row_dict["_ground_truth"] = gt_val.item() if isinstance(gt_val, (np.integer, np.floating)) else str(gt_val)
+            row_dict["_row_label"] = f"Sample Row #{idx + 1}"
+            sample_rows.append(row_dict)
+
+        # Gather categorical options for features
+        for feat in feature_names:
+            if feat in source_df.columns:
+                s = source_df[feat]
+                if s.dtype == "object" or s.nunique() <= 20:
+                    u_vals = [v for v in s.dropna().unique().tolist() if v is not None][:25]
+                    cleaned_vals = []
+                    for uv in u_vals:
+                        if isinstance(uv, (np.integer, np.floating)):
+                            cleaned_vals.append(uv.item())
+                        else:
+                            cleaned_vals.append(str(uv))
+                    categorical_options[feat] = cleaned_vals
+
+    # Fallback generic sample row if dataset not found
+    if not sample_rows:
+        sample_dict = {"_row_label": "Default Benchmark Input"}
+        for feat in feature_names:
+            feat_type = manifest.get("feature_types", {}).get(feat, "float64")
+            if "int" in feat_type:
+                sample_dict[feat] = 1
+            elif "float" in feat_type:
+                sample_dict[feat] = 1.0
+            else:
+                sample_dict[feat] = "sample"
+        sample_rows.append(sample_dict)
 
     return {
         "run_id": run_dir.name,
@@ -247,6 +347,7 @@ def load_result_from_disk(run_dir: Path) -> Dict[str, Any]:
         },
         "features": manifest.get("feature_names", []),
         "feature_types": manifest.get("feature_types", {}),
+        "categorical_options": categorical_options,
         "class_labels": manifest.get("class_labels"),
         "sample_test_rows": sample_rows,
     }
