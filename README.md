@@ -120,28 +120,53 @@ print(f"Saved Artifact: {result.artifact_path}")
 
 ---
 
-## Installation & Setup
+## Web Dashboard & User Interface
 
-### Environment Requirements
-- Python 3.12 (64-bit)
-- Windows 11 / Linux / macOS
+Universal ML Engine includes a clean, high-contrast, lightweight web dashboard for dataset inspection, AutoML orchestration, validation vs final test metrics comparison, diagnostic visualizations, and real-time model inference.
 
-### Install Dependencies
-```powershell
-& "C:\Users\surve\AppData\Local\Programs\Python\Python312\python.exe" -m pip install --prefer-binary numpy pandas scipy scikit-learn joblib openpyxl xlrd xgboost lightgbm catboost flaml optuna shap pytest
+### Quick Start (Fresh Clone Setup)
+
+#### 1. Clone the Repository
+```bash
+git clone https://github.com/SamSurve/universal-ml-engine.git
+cd universal-ml-engine
 ```
+
+#### 2. Environment Requirements
+* **Python Version:** `Python 3.12` (or `3.11`) 64-bit
+* **Operating System:** Windows 10/11, macOS, or Linux
+
+#### 3. Install Dependencies
+```bash
+pip install -r backend/requirements.txt
+```
+*(On Windows, you can also double-click `setup_windows.bat`)*
+
+#### 4. (Optional) AutoGluon Worker Environment
+If you wish to use the dedicated AutoGluon tabular booster worker in an isolated virtual environment:
+```powershell
+python -m venv .venvs\autogluon
+.\.venvs\autogluon\Scripts\pip install autogluon.tabular
+```
+*Note: If `.venvs\autogluon` is omitted, the engine automatically uses standard high-performance boosters (XGBoost, LightGBM, CatBoost, Scikit-learn baselines) and falls back gracefully to `sys.executable`.*
+
+#### 5. Launch the Web Interface
+```bash
+python run_ui.py --port 8000
+```
+Open **`http://127.0.0.1:8000`** in your browser.
 
 ---
 
 ## Running Benchmarks on Real Datasets
 
-```powershell
-& "C:\Users\surve\AppData\Local\Programs\Python\Python312\python.exe" backend/run_real_datasets.py
+```bash
+python backend/run_real_datasets.py
 ```
 
-### Running Test Suite
-```powershell
-& "C:\Users\surve\AppData\Local\Programs\Python\Python312\python.exe" -m pytest backend/tests/ -v
+### Running Automated Test Suite
+```bash
+pytest backend/tests/ -v
 ```
 
 ---

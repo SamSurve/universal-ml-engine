@@ -714,16 +714,17 @@ async function fetchRunsList() {
         if (!resp.ok) return;
         const data = await resp.json();
         const select = document.getElementById("benchmarkSelect");
+        select.innerHTML = `<option value="">-- Quick Load Verified Run --</option>`;
 
-        data.runs.forEach(run => {
-            // Avoid duplicate preset options
-            if (!Array.from(select.options).some(o => o.value === run.run_id)) {
+        if (data.runs && data.runs.length > 0) {
+            data.runs.forEach(run => {
                 const opt = document.createElement("option");
                 opt.value = run.run_id;
-                opt.textContent = `${run.run_id} (${run.problem_type} - ${run.model_name})`;
+                const pType = (run.problem_type && run.problem_type.includes("classification")) ? "Classification" : "Regression";
+                opt.textContent = `${run.model_name} (${pType} - ${run.run_id})`;
                 select.appendChild(opt);
-            }
-        });
+            });
+        }
     } catch (e) {
         console.error("Could not fetch runs list:", e);
     }

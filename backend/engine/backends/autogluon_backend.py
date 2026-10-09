@@ -29,16 +29,15 @@ class AutoGluonBackend:
     ensuring zero memory leakage, strict timeout enforcement, and native artifact persistence.
     """
 
-    DEFAULT_VENV_PATH = Path("E:/ML MODEL/.venvs/autogluon/Scripts/python.exe")
-
     @classmethod
     def get_python_executable(cls) -> str:
         """Resolves the Python interpreter dedicated to the AutoGluon backend."""
-        # 1. Project-configured dedicated environment
-        if cls.DEFAULT_VENV_PATH.exists():
-            return str(cls.DEFAULT_VENV_PATH.resolve())
+        # 1. Environment variable override
+        env_path = os.environ.get("AUTOGLUON_PYTHON")
+        if env_path and Path(env_path).exists():
+            return str(Path(env_path).resolve())
 
-        # 2. Workspace-relative .venvs/autogluon
+        # 2. Workspace-relative .venvs/autogluon (Windows)
         project_root = Path(__file__).resolve().parent.parent.parent.parent
         rel_venv = project_root / ".venvs" / "autogluon" / "Scripts" / "python.exe"
         if rel_venv.exists():
@@ -50,9 +49,6 @@ class AutoGluonBackend:
             return str(rel_venv_unix.resolve())
 
         # 4. Fallback to active runtime interpreter
-        logger.warning(
-            f"Dedicated AutoGluon venv not found at {cls.DEFAULT_VENV_PATH}. Falling back to sys.executable."
-        )
         return str(Path(sys.executable).resolve())
 
     @classmethod

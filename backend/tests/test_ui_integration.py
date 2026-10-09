@@ -31,7 +31,8 @@ def test_1_app_starts_successfully(client):
     root_resp = client.get("/")
     assert root_resp.status_code == 200
     assert "Universal ML Engine" in root_resp.text
-    assert "Judge-Ready Interface" in root_resp.text
+    assert "Thin Judge-Ready Interface" not in root_resp.text
+    assert "Verified M4/M5 Architecture" not in root_resp.text
 
 
 def test_2_csv_uploads_successfully(client):
