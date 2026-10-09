@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universal ML Engine — Judge-Ready Interface</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Top Header -->
+    <header class="navbar">
+        <div class="nav-brand">
+            <div class="logo-icon">⚡</div>
+            <div>
+                <h1 class="logo-title">Universal ML Engine</h1>
+                <p class="logo-subtitle">Thin Judge-Ready Interface • Verified M4/M5 Architecture</p>
+            </div>
+        </div>
+        <div class="nav-controls">
+            <div class="benchmark-selector-wrap">
+                <label for="benchmarkSelect" class="selector-label">Load Run:</label>
+                <select id="benchmarkSelect" class="select-input">
+                    <option value="">-- Quick Load Verified Run --</option>
+                    <option value="m5_verified_classification">Employee Turnover (Classification - M5 Verified)</option>
+                    <option value="m5_verified_regression">House Price Prediction (Regression - M5 Verified)</option>
+                </select>
+            </div>
+            <div class="status-pills">
+                <span class="pill pill-success" id="engineStatusPill">🟢 Engine Ready</span>
+                <span class="pill pill-indigo">🔒 20% Test Isolation</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+
+        <!-- Error Notification Banner -->
+        <div id="errorBanner" class="alert-banner alert-error hidden">
+            <span class="alert-icon">⚠️</span>
+            <div class="alert-content">
+                <strong id="errorTitle">Error</strong>
+                <p id="errorMessage">Something went wrong.</p>
+            </div>
+            <button class="alert-close" onclick="closeErrorBanner()">&times;</button>
+        </div>
+
+        <!-- STEP 1: DATASET INGESTION & INSPECTION -->
+        <section class="card" id="uploadSection">
+            <div class="card-header">
+                <div class="step-badge">Step 1</div>
+                <div>
+                    <h2 class="card-title">Dataset Ingestion & Inspection</h2>
+                    <p class="card-desc">Upload a CSV or Excel dataset to inspect schema, dimensions, and missing values.</p>
+                </div>
+            </div>
+
+            <!-- Upload Drop Zone -->
+            <div class="drop-zone" id="dropZone">
+                <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" class="file-input-hidden">
+                <div class="drop-zone-content">
+                    <div class="upload-icon">📁</div>
+                    <p class="drop-text">Drag and drop your dataset here, or <span class="browse-link">browse files</span></p>
+                    <p class="drop-subtext">Supported formats: CSV, XLSX, XLS • Built-in delimiter auto-detection</p>
+                    <div class="quick-samples">
+                        <span>Or test with local benchmark:</span>
+                        <button type="button" class="btn-sample" onclick="loadSampleDataset('employee_turnover.csv')">employee_turnover.csv</button>
+                        <button type="button" class="btn-sample" onclick="loadSampleDataset('HousePricePrediction.csv')">HousePricePrediction.csv</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Uploaded Dataset Inspection Box -->
+            <div id="inspectionBox" class="inspection-box hidden">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-label">Filename</span>
+                        <span class="stat-value text-mono" id="statFilename">-</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Total Rows</span>
+                        <span class="stat-value" id="statRows">-</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Total Columns</span>
+                        <span class="stat-value" id="statCols">-</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Missing Cells</span>
+                        <span class="stat-value" id="statMissing">-</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Missing Ratio</span>
+                        <span class="stat-value" id="statMissingPct">-</span>
+                    </div>
+                </div>
+
+                <!-- Column Inspection Table Drawer -->
+                <div class="table-section">
+                    <div class="section-subhead">
+                        <h3>Column Profile & Missing Value Summary</h3>
+                        <span class="badge" id="colCountBadge">0 columns</span>
+                    </div>
+                    <div class="table-container" style="max-height: 220px;">
+                        <table class="data-table" id="columnsTable">
+                            <thead>
+                                <tr>
+                                    <th>Column Name</th>
+                                    <th>Type</th>
+                                    <th>Missing Count</th>
+                                    <th>Missing %</th>
+                                    <th>Unique Values</th>
+                                </tr>
+                            </thead>
+                            <tbody id="columnsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Preview Rows Drawer -->
+                <div class="table-section">
+                    <div class="section-subhead">
+                        <h3>First 5 Data Rows</h3>
+                        <span class="badge">Raw Preview</span>
+                    </div>
+                    <div class="table-container" style="max-height: 200px;">
+                        <table class="data-table" id="previewTable">
+                            <thead id="previewTableHead"></thead>
+                            <tbody id="previewTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- STEP 2: TARGET SELECTION & PROBLEM DETECTION -->
+        <section class="card hidden" id="targetSection">
+            <div class="card-header">
+                <div class="step-badge">Step 2</div>
+                <div>
+                    <h2 class="card-title">Target Column & Problem Type</h2>
+                    <p class="card-desc">Confirm target variable. Problem type is inferred via ProblemDetector.</p>
+                </div>
+            </div>
+
+            <div class="target-controls-grid">
+                <div class="form-group">
+                    <label for="targetSelect" class="form-label">Select Target Column:</label>
+                    <select id="targetSelect" class="select-input select-large">
+                        <option value="">-- Choose Target Column --</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="timeLimitSelect" class="form-label">Training Time Budget:</label>
+                    <select id="timeLimitSelect" class="select-input">
+                        <option value="15">15 seconds (Fast demo)</option>
+                        <option value="30" selected>30 seconds (Standard benchmark)</option>
+                        <option value="60">60 seconds (High exploration)</option>
+                    </select>
+                </div>
+
+                <div class="form-actions">
+                    <button id="btnRunEngine" class="btn btn-primary btn-large" onclick="startEngineRun()">
+                        <span>🚀 Run Universal ML Engine</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Problem Detection Result Card -->
+            <div id="problemCard" class="problem-card hidden">
+                <div class="problem-header">
+                    <div class="problem-type-wrap">
+                        <span class="problem-type-label">Detected Task:</span>
+                        <span class="badge badge-lg" id="problemTypeBadge">Binary Classification</span>
+                    </div>
+                    <div class="problem-confidence-wrap">
+                        <span class="conf-label">Confidence:</span>
+                        <span class="conf-value" id="problemConfidence">1.00 (100%)</span>
+                    </div>
+                </div>
+                <p class="problem-reason" id="problemReason">Detection reason will appear here.</p>
+                <div id="classDistBox" class="class-dist-box hidden">
+                    <span class="class-dist-label">Class Distribution:</span>
+                    <div class="class-chips" id="classChips"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- STEP 3: LIVE RUNNING PROGRESS -->
+        <section class="card hidden" id="progressSection">
+            <div class="card-header">
+                <div class="step-badge progress-pulse">Step 3</div>
+                <div>
+                    <h2 class="card-title">Executing Engine Pipeline</h2>
+                    <p class="card-desc" id="progressStatusText">Running orchestration...</p>
+                </div>
+                <div class="timer-badge" id="elapsedTimer">0.0s</div>
+            </div>
+
+            <div class="progress-steps-bar">
+                <div class="step-item active" id="pstep-1">1. Ingest & Clean</div>
+                <div class="step-item" id="pstep-2">2. 3-Way Partition</div>
+                <div class="step-item" id="pstep-3">3. Baselines</div>
+                <div class="step-item" id="pstep-4">4. AutoGluon</div>
+                <div class="step-item" id="pstep-5">5. Val Selection</div>
+                <div class="step-item" id="pstep-6">6. Test Evaluation</div>
+                <div class="step-item" id="pstep-7">7. Explainability</div>
+                <div class="step-item" id="pstep-8">8. Reports</div>
+            </div>
+
+            <div class="progress-bar-wrap">
+                <div class="progress-bar-inner" id="progressBarInner"></div>
+            </div>
+        </section>
+
+        <!-- STEP 4 & 5: RESULTS, METRICS, VISUALS & REPORTS -->
+        <div id="resultsWrapper" class="hidden">
+
+            <!-- High Level Summary -->
+            <section class="card highlight-card">
+                <div class="card-header">
+                    <div class="step-badge success-badge">Verified</div>
+                    <div>
+                        <h2 class="card-title">Engine Execution Summary</h2>
+                        <p class="card-desc" id="resDatasetLabel">Dataset: - • Target: -</p>
+                    </div>
+                    <div class="header-badges">
+                        <span class="badge badge-task" id="resTaskBadge">Classification</span>
+                        <span class="badge badge-backend" id="resBackendBadge">AutoGluon</span>
+                    </div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-label">Champion Model</span>
+                        <span class="stat-value text-accent" id="resChampionName">-</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Champion Backend</span>
+                        <span class="stat-value" id="resChampionBackend">-</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Validation Score</span>
+                        <span class="stat-value text-success" id="resValScore">-</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Dataset Partitions</span>
+                        <span class="stat-value text-sm" id="resPartitionsText">-</span>
+                    </div>
+                </div>
+
+                <div class="callout-box" id="resRationaleBox">
+                    <strong>Selection Rationale:</strong>
+                    <span id="resRationaleText">-</span>
+                </div>
+            </section>
+
+            <!-- METRICS PANELS: STRICTLY SEPARATE VALIDATION VS FINAL TEST -->
+            <div class="metrics-comparison-grid">
+                
+                <!-- Panel A: Validation Metrics (Model Selection) -->
+                <div class="metric-panel panel-validation">
+                    <div class="panel-header">
+                        <div>
+                            <h3 class="panel-title">Validation Partition Metrics</h3>
+                            <p class="panel-subtitle">Used exclusively to select Champion Candidate</p>
+                        </div>
+                        <span class="badge badge-val">Validation Split (20%)</span>
+                    </div>
+                    <div class="metrics-chips-grid" id="valMetricsGrid">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Panel B: Final Test Metrics (Untouched Test Partition) -->
+                <div class="metric-panel panel-test">
+                    <div class="panel-header">
+                        <div>
+                            <h3 class="panel-title">Final Test Metrics</h3>
+                            <p class="panel-subtitle">Evaluated once on untouched, isolated holdout data</p>
+                        </div>
+                        <span class="badge badge-test">Isolated Holdout (20%)</span>
+                    </div>
+                    <div class="metrics-chips-grid" id="testMetricsGrid">
+                        <!-- Populated dynamically -->
+                    </div>
+                    <div class="isolation-notice">
+                        <span class="check-icon">✓</span>
+                        <span id="testIsolationShaText">SHA-256 Verified • Zero Data Leakage</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Candidate Models Comparison Table -->
+            <section class="card" id="allCandidatesSection">
+                <div class="card-header">
+                    <h3 class="card-title">All Candidates Evaluated on Validation Partition</h3>
+                    <span class="badge" id="candidateCountBadge">Candidates</span>
+                </div>
+                <div class="table-container">
+                    <table class="data-table" id="candidatesTable">
+                        <thead>
+                            <tr>
+                                <th>Candidate ID</th>
+                                <th>Backend</th>
+                                <th>Primary Metric</th>
+                                <th>Validation Score</th>
+                                <th>Fit Time</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="candidatesTableBody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- DIAGNOSTIC VISUALIZATIONS SECTION -->
+            <section class="card" id="visualsSection">
+                <div class="card-header">
+                    <div>
+                        <h2 class="card-title">Automated Visual Diagnostics & Explainability</h2>
+                        <p class="card-desc">High-resolution plots generated during M5 execution. Click any image to enlarge.</p>
+                    </div>
+                    <span class="badge badge-indigo">Milestone M5 Visuals</span>
+                </div>
+
+                <div class="plots-grid" id="plotsGrid">
+                    <!-- Populated dynamically based on Classification vs Regression -->
+                </div>
+
+                <!-- Feature Importance Table -->
+                <div class="table-section" id="featureImportanceSection">
+                    <div class="section-subhead">
+                        <h3>Permutation Feature Importance (Validation Partition)</h3>
+                        <span class="badge">Top Features</span>
+                    </div>
+                    <div class="table-container" style="max-height: 240px;">
+                        <table class="data-table" id="importanceTable">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Feature Name</th>
+                                    <th>Score Delta</th>
+                                    <th>Relative Importance</th>
+                                </tr>
+                            </thead>
+                            <tbody id="importanceTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- REPORTS DOWNLOAD & PREVIEW -->
+            <section class="card" id="reportsSection">
+                <div class="card-header">
+                    <div>
+                        <h2 class="card-title">Automated Reports & Artifacts</h2>
+                        <p class="card-desc">Full transparency documentation generated directly by M5ReportGenerator.</p>
+                    </div>
+                </div>
+
+                <div class="reports-action-row">
+                    <a id="btnDownloadMd" href="#" class="btn btn-secondary" target="_blank" download>
+                        📄 Download Markdown Report (.md)
+                    </a>
+                    <a id="btnDownloadJson" href="#" class="btn btn-secondary" target="_blank" download>
+                        📊 Download JSON Report (.json)
+                    </a>
+                    <button class="btn btn-outline" onclick="toggleReportDrawer()">
+                        👁️ Preview Report in Browser
+                    </button>
+                </div>
+
+                <div id="reportDrawer" class="report-drawer hidden">
+                    <div class="drawer-header">
+                        <h4>Markdown Report Preview</h4>
+                        <button class="btn-sm" onclick="toggleReportDrawer()">Close</button>
+                    </div>
+                    <pre id="reportDrawerContent" class="report-pre text-mono"></pre>
+                </div>
+            </section>
+
+            <!-- LIVE INFERENCE SECTION (REUSING UNIFIED PREDICTOR) -->
+            <section class="card" id="inferenceSection">
+                <div class="card-header">
+                    <div>
+                        <h2 class="card-title">Live Champion Inference</h2>
+                        <p class="card-desc">Interactive prediction using persisted M4 champion via <span class="text-mono">UnifiedPredictor</span>.</p>
+                    </div>
+                    <span class="badge badge-success">Persisted Champion Loaded</span>
+                </div>
+
+                <div class="inference-toolbar">
+                    <button type="button" class="btn btn-sm btn-indigo" onclick="populateSampleInferenceRow()">
+                        ⚡ Autofill with Sample Test Row
+                    </button>
+                    <span class="toolbar-hint">Instant 1-click test input for live judge demonstration</span>
+                </div>
+
+                <form id="inferenceForm" class="inference-grid" onsubmit="runPrediction(event)">
+                    <!-- Form fields dynamically rendered -->
+                </form>
+
+                <div class="inference-actions">
+                    <button type="button" class="btn btn-primary" onclick="runPrediction(event)">
+                        ⚡ Run Model Prediction
+                    </button>
+                </div>
+
+                <!-- Prediction Output Box -->
+                <div id="predictionResultBox" class="prediction-result-box hidden">
+                    <div class="pred-header">
+                        <span class="pred-title">Prediction Result:</span>
+                        <span class="pred-latency badge" id="predLatencyBadge">- ms</span>
+                    </div>
+                    <div class="pred-value-display">
+                        <span class="pred-value" id="predValueDisplay">-</span>
+                    </div>
+                    <div id="probBarContainer" class="prob-bar-container hidden">
+                        <span class="prob-label">Predicted Probabilities:</span>
+                        <div class="prob-bars" id="probBars"></div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+    </main>
+
+    <!-- Modal for High-Resolution Plot Zoom -->
+    <div id="plotModal" class="modal hidden" onclick="closePlotModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="closePlotModal()">&times;</button>
+            <h4 id="modalPlotTitle" class="modal-title">Diagnostic Plot</h4>
+            <img id="modalPlotImg" src="" alt="Plot" class="modal-img">
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

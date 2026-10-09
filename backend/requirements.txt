@@ -23,3 +23,8 @@ shap>=0.46.0
 
 # Development & Testing
 pytest>=8.0.0
+
+# Web UI Server & API
+fastapi>=0.110.0
+uvicorn>=0.28.0
+python-multipart>=0.0.9
